@@ -22,6 +22,7 @@
 
 
 #include <IOKit/usb/IOUSBLog.h> 
+#include <IOKit/usb/IOUSBRootHubDevice.h>
 
 #include "AppleUSBUHCI.h"
 
@@ -492,7 +493,7 @@ AppleUSBUHCI::UIMRootHubStatusChange(bool abort)
     UInt8								bitmap, bit;
     unsigned int						i, index, move;
     IOUSBHubPortStatus					portStatus;
-    struct InterruptTransaction			last;
+    struct UHCIRHInterruptTransaction	last;
     
     USBLog(5, "%s[%p]::UIMRootHubStatusChange (Abort: %d, _uhciAvailable: %d)", getName(), this, abort, _uhciAvailable);
         
@@ -1236,3 +1237,62 @@ AppleUSBUHCI::RHDumpHubPortStatus(IOUSBHubPortStatus *status)
     
 }
 
+
+
+void
+AppleUSBUHCI::RootHubCreationEntry(OSObject *target)
+{
+    AppleUSBUHCI *			me = OSDynamicCast(AppleUSBUHCI, target);
+	
+    if (!me )
+        return;
+	
+    me->retain();
+    me->RootHubCreation();
+    me->release();
+}
+
+
+
+void
+AppleUSBUHCI::RootHubCreation()
+{
+	USBLog(2,"AppleUSBUHCI[%p]::RootHubCreation - Need to recreate root hub on bus %ld INTR[%p] _uhciBusState[%d] _uhciAvailable[%s]", this, _busNumber, (void*)ioRead16(kUHCI_INTR), _uhciBusState, _uhciAvailable ? "true" : "false");
+	
+	if (_ehciController)
+		_ehciController->SynchronizeCompanionRootHub(this);
+	else
+	{
+		USBLog(2,"AppleUSBUHCI[%p]::RootHubCreation - no EHCI controller", this);
+	}
+	
+	USBLog(2,"AppleUSBUHCI[%p]::RootHubCreation -  Need to recreate root hub on bus %ld, powering up hardware", this, _busNumber);
+	
+	// Initialize our hardware
+	//
+	UIMInitializeForPowerUp();
+	_uhciAvailable = true;										// tell the interrupt filter routine that we are on
+	Run(true);
+	_uhciBusState = kUHCIBusStateRunning;
+	_wakingFromHibernation = false;
+	
+	IOSleep(20);												// wait 20 ms after power on before we actually create the root hub
+
+	if ( _rootHubDevice == NULL )
+	{
+		IOReturn err;
+		
+		err = CreateRootHubDevice( _device, &_rootHubDevice );
+		if ( err != kIOReturnSuccess )
+		{
+			USBError(1,"AppleUSBUHCI[%p]::RootHubCreation -  Could not create root hub device upon wakeup (%x)!", this, err);
+		}
+		else
+		{
+			USBLog(2,"AppleUSBUHCI[%p]::RootHubCreation -  calling registerService on new root hub", this);
+			_rootHubDevice->registerService(kIOServiceRequired | kIOServiceSynchronous);
+		}
+	}
+	USBLog(2,"AppleUSBUHCI[%p]::RootHubCreation - done creating root hub on bus %ld INTR[%p] _uhciBusState[%d] _uhciAvailable[%s]", this, _busNumber, (void*)ioRead16(kUHCI_INTR), _uhciBusState, _uhciAvailable ? "true" : "false");
+	return;				// nothing else to do if we are just creating the root hub
+}

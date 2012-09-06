@@ -89,7 +89,7 @@ DisjointCompletion(IOUSBController *me, IOUSBCommand *command, IOReturn status, 
 
     if (!me || !command)
     {
-		USBLog(1, "DisjointCompletion sanity check failed - me(%p) command (%p)", me, command);
+		USBError(1, "DisjointCompletion sanity check failed - me(%p) command (%p)", me, command);
 		return;
     }
 	
@@ -289,20 +289,20 @@ IOUSBController::Read(IOMemoryDescriptor *buffer, USBDeviceAddress address, Endp
     // Validate its a inny pipe and that there is a buffer
     if ((endpoint->direction != kUSBIn) || !buffer || (buffer->getLength() < reqCount))
     {
-        USBLog(4, "%s[%p]::Read - direction is not kUSBIn (%d), No Buffer, or buffer length < reqCount (%ld < %ld). Returning kIOReturnBadArgument(0x%x)", getName(), this, endpoint->direction,  buffer->getLength(), reqCount, kIOReturnBadArgument);
+        USBLog(2, "%s[%p]::Read - direction is not kUSBIn (%d), No Buffer, or buffer length < reqCount (%ld < %ld). Returning kIOReturnBadArgument(0x%x)", getName(), this, endpoint->direction,  buffer->getLength(), reqCount, kIOReturnBadArgument);
 		return kIOReturnBadArgument;
     }
     
     if ((endpoint->transferType != kUSBBulk) && (noDataTimeout || completionTimeout))
     {
-        USBLog(4, "%s[%p]::Read - Pipe is NOT kUSBBulk (%d) AND specified a timeout (%ld, %ld).  Returning kIOReturnBadArgument(0x%x)", getName(), this, endpoint->transferType, noDataTimeout, completionTimeout, kIOReturnBadArgument);
+        USBLog(2, "%s[%p]::Read - Pipe is NOT kUSBBulk (%d) AND specified a timeout (%ld, %ld).  Returning kIOReturnBadArgument(0x%x)", getName(), this, endpoint->transferType, noDataTimeout, completionTimeout, kIOReturnBadArgument);
 		return kIOReturnBadArgument; // timeouts only on bulk pipes
     }
     
     // Validate the completion
     if (!completion)
     {
-        USBLog(4, "%s[%p]::Read - No Completion routine.  Returning kIOReturnNoCompletion(0x%x)", getName(), this, kIOReturnNoCompletion);
+        USBLog(2, "%s[%p]::Read - No Completion routine.  Returning kIOReturnNoCompletion(0x%x)", getName(), this, kIOReturnNoCompletion);
 		return kIOReturnNoCompletion;
     }
     
@@ -408,7 +408,7 @@ IOUSBController::Read(IOMemoryDescriptor *buffer, USBDeviceAddress address, Endp
 			nullCompletion = command->GetDisjointCompletion();
 			if (nullCompletion.action)
 			{
-				USBLog(6, "%s[%p]::Read - SYNC xfer or immediate error with Disjoint Completion", getName(), this);
+				USBLog(2, "%s[%p]::Read - SYNC xfer or immediate error with Disjoint Completion", getName(), this);
 			}
 			if (memDesc)
 			{
@@ -595,7 +595,7 @@ IOUSBController::Write(IOMemoryDescriptor *buffer, USBDeviceAddress address, End
 			nullCompletion = command->GetDisjointCompletion();
 			if (nullCompletion.action)
 			{
-				USBLog(6, "%s[%p]::Write - SYNC xfer or immediate error with Disjoint Completion", getName(), this);
+				USBLog(1, "%s[%p]::Write - SYNC xfer or immediate error with Disjoint Completion", getName(), this);
 			}
 			if (memDesc)
 			{

@@ -1223,14 +1223,6 @@ IOUSBDeviceUserClient::stop(IOService * provider)
     
     USBLog(7, "+%s[%p]::stop(%p)", getName(), this, provider);
 
-    if (fGate)
-    {
-		if (fWorkLoop)
-			fWorkLoop->removeEventSource(fGate);
-		
-		fGate->release();
-		fGate = NULL;
-    }
     super::stop(provider);
 
     USBLog(7, "-%s[%p]::stop(%p)", getName(), this, provider);
@@ -1243,6 +1235,15 @@ void
 IOUSBDeviceUserClient::free()
 {
     USBLog(7,"IOUSBDeviceUserClient::free");
+
+    if (fGate)
+    {
+		if (fWorkLoop)
+			fWorkLoop->removeEventSource(fGate);
+		
+		fGate->release();
+		fGate = NULL;
+    }
 
 	if (fWorkLoop)
 	{
@@ -1312,7 +1313,7 @@ IOUSBDeviceUserClient::didTerminate( IOService * provider, IOOptionBits options,
     // hold on to the device and IOKit will terminate us when we close it later
     USBLog(6, "%s[%p]::didTerminate isInactive = %d, outstandingIO = %ld", getName(), this, isInactive(), fOutstandingIO);
 
-    if ( fOwner )
+    if ( fOwner && fOwner->isOpen() )
     {
         if ( fOutstandingIO == 0 )
 		{

@@ -435,9 +435,9 @@ AppleUSBOHCI::setPowerState( unsigned long powerStateOrdinal, IOService* whatDev
 				UIMFinalizeForPowerDown();
 				_ohciAvailable = false;					// tell the interrupt filter routine that we are off
 
-				USBLog(3,"AppleUSBOHCI[%p]::setPowerState - Would create root hub here, postponing it! (%d)", this, _needToCreateRootHub);
-				_needToCreateRootHub = TRUE;
-				
+				IOSleep(50);				// this appears to the devices as a reset, so wait the required 50 ms
+				USBLog(3,"AppleUSBOHCI[%p]::setPowerState - Would create root hub here, postponing it!", this);
+				thread_call_enter(_rootHubCreationThread);
 			}
 		}
 

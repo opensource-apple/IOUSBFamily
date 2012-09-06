@@ -68,8 +68,6 @@ AppleUSBEHCI::init(OSDictionary * propTable)
     if (!_intLock)
 		goto ErrorExit;
 	
-    _controllerSpeed = kUSBDeviceSpeedHigh;	// This needs to be set before start.
-											// super uses it during start method
     _wdhLock = IOSimpleLockAlloc();
     if (!_wdhLock)
 		goto ErrorExit;
@@ -79,6 +77,8 @@ AppleUSBEHCI::init(OSDictionary * propTable)
 		goto ErrorExit;
 
     _uimInitialized = false;
+    _controllerSpeed = kUSBDeviceSpeedHigh;	// This needs to be set before start.
+											// super uses it during start method
     
     // Initialize our consumer and producer counts.  
     //
@@ -89,6 +89,12 @@ AppleUSBEHCI::init(OSDictionary * propTable)
 	_portDetectInterruptThread = thread_call_allocate((thread_call_func_t)PortDetectInterruptThreadEntry, (thread_call_param_t)this);
 	
 	if ( !_portDetectInterruptThread)
+		goto ErrorExit;
+	
+	// Allocate a thread call to create the root hub
+	_rootHubCreationThread = thread_call_allocate((thread_call_func_t)RootHubCreationEntry, (thread_call_param_t)this);
+	
+	if ( !_rootHubCreationThread)
 		goto ErrorExit;
 	
     return true;
@@ -157,7 +163,7 @@ void AppleUSBEHCI::showRegisters(char *s)
 bool
 AppleUSBEHCI::start( IOService * provider )
 {
-    USBLog(7, "AppleUSBEHCI[%p]::start",  this);
+   USBLog(7, "AppleUSBEHCI[%p]::start",  this);
     
     if( !super::start(provider))
         return (false);
@@ -234,8 +240,8 @@ AppleUSBEHCI::UIMInitialize(IOService * provider)
         _pEHCICapRegisters = (EHCICapRegistersPtr) _deviceBase->getVirtualAddress();
 		
         // enable the card registers
-        lvalue = _device->configRead16(cwCommand);
-        _device->configWrite16(cwCommand, lvalue | cwCommandEnableMemorySpace);
+        lvalue = _device->configRead16(kIOPCIConfigCommand);
+        _device->configWrite16(kIOPCIConfigCommand, lvalue | kIOPCICommandMemorySpace);
 		
         err = AcquireOSOwnership();
         if ( err != kIOReturnSuccess )
@@ -300,8 +306,8 @@ AppleUSBEHCI::UIMInitialize(IOService * provider)
         IOSync();
                         
         // enable card bus mastering
-        lvalue = _device->configRead16(cwCommand);
-         _device->configWrite16(cwCommand, lvalue  | cwCommandEnableBusMaster | cwCommandEnableMemorySpace);
+        lvalue = _device->configRead16(kIOPCIConfigCommand);
+         _device->configWrite16(kIOPCIConfigCommand, lvalue  | kIOPCICommandBusMaster | kIOPCICommandMemorySpace);
 
 		// turn on transaction completion/error interrupts
 		_pEHCIRegisters->USBIntr = HostToUSBLong(kEHCICompleteIntBit | kEHCIErrorIntBit | kEHCIHostErrorIntBit | kEHCIFrListRolloverIntBit);
@@ -613,7 +619,7 @@ AppleUSBEHCI::UIMFinalize(void)
 
         // Take away the controllers ability be a bus master.
         //
-        _device->configWrite32(cwCommand, cwCommandEnableMemorySpace);
+        _device->configWrite32(kIOPCIConfigCommand, kIOPCICommandMemorySpace);
 		
         _pEHCIRegisters->PeriodicListBase = 0;		// no periodic list as yet
 		_pEHCIRegisters->AsyncListAddr = 0;			// no async list as yet
@@ -1139,8 +1145,8 @@ AppleUSBEHCI::UIMInitializeForPowerUp(void)
     do {
 		
         // enable the card registers
-        lvalue = _device->configRead16(cwCommand);
-        _device->configWrite16(cwCommand, lvalue | cwCommandEnableMemorySpace);
+        lvalue = _device->configRead16(kIOPCIConfigCommand);
+        _device->configWrite16(kIOPCIConfigCommand, lvalue | kIOPCICommandMemorySpace);
 		
         CapLength  = _pEHCICapRegisters->CapLength;
         _pEHCIRegisters = (EHCIRegistersPtr) ( ((UInt32)_pEHCICapRegisters) + CapLength);
@@ -1196,8 +1202,8 @@ AppleUSBEHCI::UIMInitializeForPowerUp(void)
 		}
 		
         // enable card bus mastering
-        lvalue = _device->configRead16(cwCommand);
-        _device->configWrite16(cwCommand, lvalue | (cwCommandEnableBusMaster | cwCommandEnableMemorySpace));
+        lvalue = _device->configRead16(kIOPCIConfigCommand);
+        _device->configWrite16(kIOPCIConfigCommand, lvalue | (kIOPCICommandBusMaster | kIOPCICommandMemorySpace));
 		
         // turn on transaction completion/error interrupts
         //
@@ -1353,7 +1359,7 @@ AppleUSBEHCI::UIMFinalizeForPowerDown(void)
 		
 		// Take away the controllers ability be a bus master.
         //
-        _device->configWrite16(cwCommand, cwCommandEnableMemorySpace);
+        _device->configWrite16(kIOPCIConfigCommand, kIOPCICommandMemorySpace);
 		
         _pEHCIRegisters->PeriodicListBase = 0;	// no periodic list as yet
 		_pEHCIRegisters->AsyncListAddr = 0;		// no async list as yet

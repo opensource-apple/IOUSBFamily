@@ -1085,106 +1085,106 @@ IOUSBInterface::matchPropertyTable(OSDictionary * table, SInt32 *score)
     
     //  Only execute the debug code if we are logging at higher than level 4
     //
-    if ( gKernelDebugLevel > 4 )
+    if ( (*score > 0) && (gKernelDebugLevel > 4) )
     {
-	OSString * 	identifier = OSDynamicCast(OSString, table->getObject("CFBundleIdentifier"));
-	OSNumber *	vendor = (OSNumber *) getProperty(kUSBVendorID);
-	OSNumber *	product = (OSNumber *) getProperty(kUSBProductID);
-	OSNumber *	release = (OSNumber *) getProperty(kUSBDeviceReleaseNumber);
-	OSNumber *	configuration = (OSNumber *) getProperty(kUSBConfigurationValue);
-	OSNumber *	interfaceNumber = (OSNumber *) getProperty(kUSBInterfaceNumber);
-	OSNumber *	interfaceSubClass = (OSNumber *) getProperty(kUSBInterfaceSubClass);
-	OSNumber *	protocol = (OSNumber *) getProperty(kUSBInterfaceProtocol);
-	OSNumber *	dictVendor = (OSNumber *) table->getObject(kUSBVendorID);
-	OSNumber *	dictProduct = (OSNumber *) table->getObject(kUSBProductID);
-	OSNumber *	dictRelease = (OSNumber *) table->getObject(kUSBDeviceReleaseNumber);
-	OSNumber *	dictConfiguration = (OSNumber *) table->getObject(kUSBConfigurationValue);
-	OSNumber *	dictInterfaceNumber = (OSNumber *) table->getObject(kUSBInterfaceNumber);
-	OSNumber *	dictInterfaceClass = (OSNumber *) table->getObject(kUSBInterfaceClass);
-	OSNumber *	dictInterfaceSubClass = (OSNumber *) table->getObject(kUSBInterfaceSubClass);
-	OSNumber *	dictProtocol = (OSNumber *) table->getObject(kUSBInterfaceProtocol);
-	OSNumber *	dictMask = (OSNumber *) table->getObject(kUSBProductIDMask);
-	bool		match;
-	
-	if (identifier)
-	    USBLog(5,"Finding driver for interface #%d of %s, matching personality using %s, score: %ld, wildCard = %ld", _bInterfaceNumber, _device->getName(), identifier->getCStringNoCopy(), *score, wildCardMatches);
-	else
-	    USBLog(6,"Finding driver for interface #%d of %s, matching user client dictionary, score: %ld", _bInterfaceNumber, _device->getName(), *score);
-	
-	if ( vendor && product && release && configuration && interfaceNumber && interfaceClass && interfaceSubClass && protocol )
-	{
-	    char tempString[256]="";
-	    
-	    sprintf(logString,"\tMatched: ");
-	    match = false;
-	    if ( vendorPropertyMatches ) { match = true; sprintf(tempString,"idVendor (%d) ", vendor->unsigned32BitValue()); strcat(logString, tempString); }
-	    if ( productPropertyMatches ) { match = true; sprintf(tempString,"idProduct (%d) ", product->unsigned32BitValue()); strcat(logString, tempString); }
-	    if ( usedMaskForProductID && dictMask && dictProduct) { sprintf(tempString,"to (%d) with mask (0x%x), ", dictProduct->unsigned32BitValue(), dictMask->unsigned32BitValue()); strcat(logString, tempString);}
-	    if ( deviceReleasePropertyMatches ) { match = true; sprintf(tempString,"bcdDevice (%d) ", release->unsigned32BitValue()); strcat(logString, tempString); }
-	    if ( configurationValuePropertyMatches ) { match = true; sprintf(tempString,"bConfigurationValue (%d) ", configuration->unsigned32BitValue());strcat(logString, tempString);  }
-	    if ( interfaceNumberPropertyMatches ) { match = true; sprintf(tempString,"bInterfaceNumber (%d) ", interfaceNumber->unsigned32BitValue());strcat(logString, tempString);  }
-	    if ( interfaceClassPropertyMatches ) { match = true; sprintf(tempString,"bInterfaceClass (%d) ", interfaceClass->unsigned32BitValue()); strcat(logString, tempString); }
-	    if ( interfaceSubClassPropertyMatches ) { match = true; sprintf(tempString,"bInterfaceSubClass (%d) ", interfaceSubClass->unsigned32BitValue());strcat(logString, tempString);  }
-	    if ( interfaceProtocolPropertyMatches ) { match = true; sprintf(tempString,"bInterfaceProtocol (%d) ", protocol->unsigned32BitValue());strcat(logString, tempString);  }
-	    if ( !match ) strcat(logString, "no properties");
-	    
-	    USBLog(6,logString);
-	    
-	    sprintf(logString,"\tDidn't Match: ");
-	    
-	    match = false;
-	    if ( !vendorPropertyMatches && dictVendor ) 
-	    { 
-		match = true; 
-		sprintf(tempString,"idVendor (%d,%d) ", dictVendor->unsigned32BitValue(), vendor->unsigned32BitValue()); 
-		strcat(logString, tempString); 
-	    }
-	    if ( !productPropertyMatches && dictProduct) 
-	    { 
-		match = true; 
-		sprintf(tempString,"idProduct (%d,%d) ", dictProduct->unsigned32BitValue(), product->unsigned32BitValue()); 
-		strcat(logString, tempString); 
-	    }
-	    if ( !deviceReleasePropertyMatches && dictRelease) 
-	    { 
-		match = true; 
-		sprintf(tempString,"bcdDevice (%d,%d) ", dictRelease->unsigned32BitValue(), release->unsigned32BitValue()); 
-		strcat(logString, tempString); 
-	    }
-	    if ( !configurationValuePropertyMatches && dictConfiguration) 
-	    { 
-		match = true; 
-		sprintf(tempString,"bConfigurationValue (%d,%d) ", dictConfiguration->unsigned32BitValue(), configuration->unsigned32BitValue()); 
-		strcat(logString, tempString); 
-	    }
-	    if ( !interfaceNumberPropertyMatches && dictInterfaceNumber) 
-	    { 
-		match = true; 
-		sprintf(tempString,"bInterfaceNumber (%d,%d) ", dictInterfaceNumber->unsigned32BitValue(), interfaceNumber->unsigned32BitValue()); 
-		strcat(logString, tempString); 
-	    }
-	    if ( !interfaceClassPropertyMatches && dictInterfaceClass) 
-	    { 
-		match = true; 
-		sprintf(tempString,"bInterfaceClass (%d,%d) ", dictInterfaceClass->unsigned32BitValue(), interfaceClass->unsigned32BitValue()); 
-		strcat(logString, tempString); 
-	    }
-	    if ( !interfaceSubClassPropertyMatches && dictInterfaceSubClass) 
-	    { 
-		match = true; 
-		sprintf(tempString,"bInterfaceSubClass (%d,%d) ", dictInterfaceSubClass->unsigned32BitValue(), interfaceSubClass->unsigned32BitValue()); 
-		strcat(logString, tempString); 
-	    }
-	    if ( !interfaceProtocolPropertyMatches && dictProtocol) 
-	    { 
-		match = true; 
-		sprintf(tempString,"bDeviceProtocol (%d,%d) ", dictProtocol->unsigned32BitValue(), protocol->unsigned32BitValue()); 
-		strcat(logString, tempString); 
-	    }
-	    if ( !match ) strcat(logString,"nothing");
-	    
-	    USBLog(6,logString);
-	}
+		OSString * 	identifier = OSDynamicCast(OSString, table->getObject("CFBundleIdentifier"));
+		OSNumber *	vendor = (OSNumber *) getProperty(kUSBVendorID);
+		OSNumber *	product = (OSNumber *) getProperty(kUSBProductID);
+		OSNumber *	release = (OSNumber *) getProperty(kUSBDeviceReleaseNumber);
+		OSNumber *	configuration = (OSNumber *) getProperty(kUSBConfigurationValue);
+		OSNumber *	interfaceNumber = (OSNumber *) getProperty(kUSBInterfaceNumber);
+		OSNumber *	interfaceSubClass = (OSNumber *) getProperty(kUSBInterfaceSubClass);
+		OSNumber *	protocol = (OSNumber *) getProperty(kUSBInterfaceProtocol);
+		OSNumber *	dictVendor = (OSNumber *) table->getObject(kUSBVendorID);
+		OSNumber *	dictProduct = (OSNumber *) table->getObject(kUSBProductID);
+		OSNumber *	dictRelease = (OSNumber *) table->getObject(kUSBDeviceReleaseNumber);
+		OSNumber *	dictConfiguration = (OSNumber *) table->getObject(kUSBConfigurationValue);
+		OSNumber *	dictInterfaceNumber = (OSNumber *) table->getObject(kUSBInterfaceNumber);
+		OSNumber *	dictInterfaceClass = (OSNumber *) table->getObject(kUSBInterfaceClass);
+		OSNumber *	dictInterfaceSubClass = (OSNumber *) table->getObject(kUSBInterfaceSubClass);
+		OSNumber *	dictProtocol = (OSNumber *) table->getObject(kUSBInterfaceProtocol);
+		OSNumber *	dictMask = (OSNumber *) table->getObject(kUSBProductIDMask);
+		bool		match;
+		
+		if (identifier)
+			USBLog(5,"Finding driver for interface #%d of %s, matching personality using %s, score: %ld, wildCard = %ld", _bInterfaceNumber, _device->getName(), identifier->getCStringNoCopy(), *score, wildCardMatches);
+		else
+			USBLog(6,"Finding driver for interface #%d of %s, matching user client dictionary, score: %ld", _bInterfaceNumber, _device->getName(), *score);
+		
+		if ( vendor && product && release && configuration && interfaceNumber && interfaceClass && interfaceSubClass && protocol )
+		{
+			char tempString[256]="";
+			
+			sprintf(logString,"\tMatched: ");
+			match = false;
+			if ( vendorPropertyMatches ) { match = true; sprintf(tempString,"idVendor (%d) ", vendor->unsigned32BitValue()); strcat(logString, tempString); }
+			if ( productPropertyMatches ) { match = true; sprintf(tempString,"idProduct (%d) ", product->unsigned32BitValue()); strcat(logString, tempString); }
+			if ( usedMaskForProductID && dictMask && dictProduct) { sprintf(tempString,"to (%d) with mask (0x%x), ", dictProduct->unsigned32BitValue(), dictMask->unsigned32BitValue()); strcat(logString, tempString);}
+			if ( deviceReleasePropertyMatches ) { match = true; sprintf(tempString,"bcdDevice (%d) ", release->unsigned32BitValue()); strcat(logString, tempString); }
+			if ( configurationValuePropertyMatches ) { match = true; sprintf(tempString,"bConfigurationValue (%d) ", configuration->unsigned32BitValue());strcat(logString, tempString);  }
+			if ( interfaceNumberPropertyMatches ) { match = true; sprintf(tempString,"bInterfaceNumber (%d) ", interfaceNumber->unsigned32BitValue());strcat(logString, tempString);  }
+			if ( interfaceClassPropertyMatches ) { match = true; sprintf(tempString,"bInterfaceClass (%d) ", interfaceClass->unsigned32BitValue()); strcat(logString, tempString); }
+			if ( interfaceSubClassPropertyMatches ) { match = true; sprintf(tempString,"bInterfaceSubClass (%d) ", interfaceSubClass->unsigned32BitValue());strcat(logString, tempString);  }
+			if ( interfaceProtocolPropertyMatches ) { match = true; sprintf(tempString,"bInterfaceProtocol (%d) ", protocol->unsigned32BitValue());strcat(logString, tempString);  }
+			if ( !match ) strcat(logString, "no properties");
+			
+			USBLog(6,logString);
+			
+			sprintf(logString,"\tDidn't Match: ");
+			
+			match = false;
+			if ( !vendorPropertyMatches && dictVendor ) 
+			{ 
+				match = true; 
+				sprintf(tempString,"idVendor (%d,%d) ", dictVendor->unsigned32BitValue(), vendor->unsigned32BitValue()); 
+				strcat(logString, tempString); 
+			}
+			if ( !productPropertyMatches && dictProduct) 
+			{ 
+				match = true; 
+				sprintf(tempString,"idProduct (%d,%d) ", dictProduct->unsigned32BitValue(), product->unsigned32BitValue()); 
+				strcat(logString, tempString); 
+			}
+			if ( !deviceReleasePropertyMatches && dictRelease) 
+			{ 
+				match = true; 
+				sprintf(tempString,"bcdDevice (%d,%d) ", dictRelease->unsigned32BitValue(), release->unsigned32BitValue()); 
+				strcat(logString, tempString); 
+			}
+			if ( !configurationValuePropertyMatches && dictConfiguration) 
+			{ 
+				match = true; 
+				sprintf(tempString,"bConfigurationValue (%d,%d) ", dictConfiguration->unsigned32BitValue(), configuration->unsigned32BitValue()); 
+				strcat(logString, tempString); 
+			}
+			if ( !interfaceNumberPropertyMatches && dictInterfaceNumber) 
+			{ 
+				match = true; 
+				sprintf(tempString,"bInterfaceNumber (%d,%d) ", dictInterfaceNumber->unsigned32BitValue(), interfaceNumber->unsigned32BitValue()); 
+				strcat(logString, tempString); 
+			}
+			if ( !interfaceClassPropertyMatches && dictInterfaceClass) 
+			{ 
+				match = true; 
+				sprintf(tempString,"bInterfaceClass (%d,%d) ", dictInterfaceClass->unsigned32BitValue(), interfaceClass->unsigned32BitValue()); 
+				strcat(logString, tempString); 
+			}
+			if ( !interfaceSubClassPropertyMatches && dictInterfaceSubClass) 
+			{ 
+				match = true; 
+				sprintf(tempString,"bInterfaceSubClass (%d,%d) ", dictInterfaceSubClass->unsigned32BitValue(), interfaceSubClass->unsigned32BitValue()); 
+				strcat(logString, tempString); 
+			}
+			if ( !interfaceProtocolPropertyMatches && dictProtocol) 
+			{ 
+				match = true; 
+				sprintf(tempString,"bDeviceProtocol (%d,%d) ", dictProtocol->unsigned32BitValue(), protocol->unsigned32BitValue()); 
+				strcat(logString, tempString); 
+			}
+			if ( !match ) strcat(logString,"nothing");
+			
+			USBLog(6,logString);
+		}
     }
 	
 	if (interfaceClassProp)
@@ -1197,31 +1197,52 @@ IOReturn
 IOUSBInterface::message( UInt32 type, IOService * provider,  void * argument )
 {
     IOReturn	err = kIOReturnSuccess;
-    
+    IOUSBPipe *	pipe;
+    int			i;
+	
     switch ( type )
     {
         case kIOUSBMessagePortHasBeenSuspended:
             // Forward the message to our clients
             //
 			USBLog(6, "%s[%p]::message - received kIOUSBMessagePortHasBeenSuspended", getName(), this);
-            messageClients( kIOUSBMessagePortHasBeenSuspended, this, NULL);
+            messageClients( kIOUSBMessagePortHasBeenSuspended, argument, sizeof(IOReturn) );
             break;
 			
         case kIOUSBMessagePortHasBeenReset:
+			
+			// First, reset all our pipes so that the UIM clears any state
+			//
+			for ( i = 0; i < kUSBMaxPipes; i++)
+			{
+				pipe = _pipeList[i];
+				if( pipe ) 
+				{
+					pipe->Reset(); 
+				}
+			}
+			
+			// We should also set the alternate interface here if we have set it in the past
+			
             // Forward the message to our clients
             //
  			USBLog(6, "%s[%p]::message - received kIOUSBMessagePortHasBeenReset", getName(), this);
-			messageClients( kIOUSBMessagePortHasBeenReset, this, NULL);
+			messageClients( kIOUSBMessagePortHasBeenReset, argument, sizeof(IOReturn) );
             break;
 			
 		case kIOUSBMessagePortHasBeenResumed:
             // Forward the message to our clients
             //
 			USBLog(6, "%s[%p]::message - received kIOUSBMessagePortHasBeenResumed", getName(), this);
-            messageClients( kIOUSBMessagePortHasBeenResumed, this, NULL);
+            messageClients( kIOUSBMessagePortHasBeenResumed, NULL, 0);
             break;
   
-        case kIOMessageServiceIsTerminated: 
+  		case kIOUSBMessageCompositeDriverReconfigured:
+            USBLog(5, "%s[%p]::message - received kIOUSBMessageCompositeDriverReconfigured",getName(), this);
+			messageClients( kIOUSBMessageCompositeDriverReconfigured, NULL, 0);
+			break;
+			
+		case kIOMessageServiceIsTerminated: 
             break;
             
         case kIOMessageServiceIsSuspended:

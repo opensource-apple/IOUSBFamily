@@ -1236,7 +1236,9 @@ IOUSBHIDDriver::CheckForDeadDevice()
     //
     if ( _interface && _device )
     {
+		_device->retain();
         err = _device->message(kIOUSBMessageHubIsDeviceConnected, NULL, 0);
+		_device->release();
     
         if ( kIOReturnSuccess == err )
         {

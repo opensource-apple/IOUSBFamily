@@ -49,6 +49,7 @@ extern "C" {
 #include <IOKit/usb/IOUSBControllerV2.h>
 
 #include "UHCI.h"
+#include "AppleUSBEHCI.h"
 
 // forward declarations
 class AppleUHCItdMemoryBlock;
@@ -242,7 +243,8 @@ enum
 };
 
 
-struct InterruptTransaction {
+struct UHCIRHInterruptTransaction 
+{
     IOMemoryDescriptor *		buf;
     UInt32						bufLen;
     IOUSBCompletion				completion;
@@ -304,7 +306,6 @@ protected:
     bool							_uimInitialized;
     bool							_uhciAvailable;
     bool							_idleSuspend;
-	bool							_needToCreateRootHub;
 	bool							_wakingFromHibernation;
     
 	queue_head_t					_cbiAlignmentBuffers;			// alignment buffers for control/bulk/interrupt (64 byte buffers)
@@ -363,26 +364,30 @@ protected:
 	AppleUHCIQueueHead					*_pFreeQH;
 	AppleUHCIQueueHead					*_pLastFreeQH;
 	
+	// EHCI controller (if we are a companion)
+	AppleUSBEHCI						*_ehciController;
+	
     IOSimpleLock *						_isochScheduleLock;
     IOSimpleLock *						_wdhLock;
     UInt16								_outSlot;
 	UInt32								_controlBulkTransactionsOut;
+    thread_call_t						_rootHubCreationThread;
 
     IOReturn TDToUSBError(UInt32 error);
     void CompleteIsoc(IOUSBIsocCompletion completion, IOReturn status, void *pFrames);
     
     /* Root hub support. */
-    IOTimerEventSource				*_rhTimer;
-    UInt16							_rootFunctionNumber;
-	UInt8							_rootHubPollingRate;
-    UInt16							_lastPortStatus[kUHCI_NUM_PORTS];
-    bool							_portWasReset[kUHCI_NUM_PORTS];
-    bool							_portSuspendChange[kUHCI_NUM_PORTS];
-    AbsoluteTime					_rhChangeTime;
-    struct InterruptTransaction		_outstandingTrans[kMaxOutstandingTrans];
-    IOLock *						_intLock;
-	bool							_previousPortRecoveryAttempted[kUHCI_NUM_PORTS];
-    AbsoluteTime					_portRecoveryTime[kUHCI_NUM_PORTS];
+    IOTimerEventSource						*_rhTimer;
+    UInt16									_rootFunctionNumber;
+	UInt8									_rootHubPollingRate;
+    UInt16									_lastPortStatus[kUHCI_NUM_PORTS];
+    bool									_portWasReset[kUHCI_NUM_PORTS];
+    bool									_portSuspendChange[kUHCI_NUM_PORTS];
+    AbsoluteTime							_rhChangeTime;
+    struct UHCIRHInterruptTransaction		_outstandingTrans[kMaxOutstandingTrans];
+    IOLock *								_intLock;
+	bool									_previousPortRecoveryAttempted[kUHCI_NUM_PORTS];
+    AbsoluteTime							_portRecoveryTime[kUHCI_NUM_PORTS];
 
 	// Isoch support
 	volatile AppleUHCIIsochTransferDescriptor	*_savedDoneQueueHead;				// saved by the Filter Interrupt routine
@@ -401,6 +406,9 @@ protected:
     AbsoluteTime					RHLastPortStatusChanged(void);
     bool							RHAreAllPortsDisconnectedOrSuspended(void);
     void							RHCheckStatus(void);
+
+	static void						RootHubCreationEntry(OSObject *target);
+	void							RootHubCreation();
 
     // Port numbers are 1-based
     void							RHEnablePort(int port, bool enable);
@@ -447,6 +455,7 @@ protected:
     IOReturn						HardwareInit(void);
     IOReturn						Run(bool);
 	IOReturn						InitializeAlignmentBuffers(void);
+	IOReturn						CheckForEHCIController(IOService*);
     
     // Memory management
 	AppleUHCITransferDescriptor			*AllocateTD(AppleUHCIQueueHead *);

@@ -329,7 +329,7 @@
 	<key>CFBundleExecutable</key>
 	<string>AppleUSBOHCI</string>
 	<key>CFBundleGetInfoString</key>
-	<string>2.6.0, Copyright © 2000-2006 Apple Computer Inc., All Rights Reserved</string>
+	<string>2.6.5, Copyright © 2000-2006 Apple Computer Inc., All Rights Reserved</string>
 	<key>CFBundleIconFile</key>
 	<string></string>
 	<key>CFBundleIdentifier</key>
@@ -341,11 +341,11 @@
 	<key>CFBundlePackageType</key>
 	<string>KEXT</string>
 	<key>CFBundleShortVersionString</key>
-	<string>2.6.0</string>
+	<string>2.6.5</string>
 	<key>CFBundleSignature</key>
 	<string>????</string>
 	<key>CFBundleVersion</key>
-	<string>2.6.0</string>
+	<string>2.6.5</string>
 	<key>IOKitPersonalities</key>
 	<dict>
 		<key>AppleUSBOHCI</key>
@@ -422,7 +422,7 @@
 	<key>CFBundleExecutable</key>
 	<string>IOUSBFamily</string>
 	<key>CFBundleGetInfoString</key>
-	<string>2.6.1, Copyright © 2000-2006 Apple Computer Inc., All Rights Reserved</string>
+	<string>2.6.5, Copyright © 2000-2006 Apple Computer Inc., All Rights Reserved</string>
 	<key>CFBundleIconFile</key>
 	<string></string>
 	<key>CFBundleIdentifier</key>
@@ -434,11 +434,11 @@
 	<key>CFBundlePackageType</key>
 	<string>KEXT</string>
 	<key>CFBundleShortVersionString</key>
-	<string>2.6.1</string>
+	<string>2.6.5</string>
 	<key>CFBundleSignature</key>
 	<string>????</string>
 	<key>CFBundleVersion</key>
-	<string>2.6.1</string>
+	<string>2.6.5</string>
 	<key>IOKitPersonalities</key>
 	<dict/>
 	<key>OSBundleCompatibleVersion</key>
@@ -483,7 +483,7 @@
 	<key>CFBundleExecutable</key>
 	<string>AppleUSBHub</string>
 	<key>CFBundleGetInfoString</key>
-	<string>2.6.0, Copyright © 2000-2006 Apple Computer Inc., All Rights Reserved</string>
+	<string>2.6.5, Copyright © 2000-2006 Apple Computer Inc., All Rights Reserved</string>
 	<key>CFBundleIconFile</key>
 	<string></string>
 	<key>CFBundleIdentifier</key>
@@ -495,11 +495,11 @@
 	<key>CFBundlePackageType</key>
 	<string>KEXT</string>
 	<key>CFBundleShortVersionString</key>
-	<string>2.6.0</string>
+	<string>2.6.5</string>
 	<key>CFBundleSignature</key>
 	<string>????</string>
 	<key>CFBundleVersion</key>
-	<string>2.6.0</string>
+	<string>2.6.5</string>
 	<key>IOKitPersonalities</key>
 	<dict>
 		<key>AppleUSBHub0</key>
@@ -641,7 +641,7 @@
 	<key>CFBundleExecutable</key>
 	<string>IOUSBUserClient</string>
 	<key>CFBundleGetInfoString</key>
-	<string>2.6.0, Copyright © 2000-2006 Apple Computer Inc., All Rights Reserved</string>
+	<string>2.7.0, Copyright © 2000-2006 Apple Computer Inc., All Rights Reserved</string>
 	<key>CFBundleIconFile</key>
 	<string></string>
 	<key>CFBundleIdentifier</key>
@@ -653,11 +653,11 @@
 	<key>CFBundlePackageType</key>
 	<string>KEXT</string>
 	<key>CFBundleShortVersionString</key>
-	<string>2.6.0</string>
+	<string>2.7.0</string>
 	<key>CFBundleSignature</key>
 	<string>????</string>
 	<key>CFBundleVersion</key>
-	<string>2.6.0</string>
+	<string>2.7.0</string>
 	<key>IOKitPersonalities</key>
 	<dict>
 		<key>IOUSBDeviceUserClientInit</key>
@@ -806,7 +806,7 @@
 	<key>CFBundleExecutable</key>
 	<string>IOUSBHIDDriver</string>
 	<key>CFBundleGetInfoString</key>
-	<string>2.6.0, Copyright © 2000-2006 Apple Computer Inc., All Rights Reserved</string>
+	<string>2.6.5, Copyright © 2000-2006 Apple Computer Inc., All Rights Reserved</string>
 	<key>CFBundleIconFile</key>
 	<string></string>
 	<key>CFBundleIdentifier</key>
@@ -818,11 +818,11 @@
 	<key>CFBundlePackageType</key>
 	<string>KEXT</string>
 	<key>CFBundleShortVersionString</key>
-	<string>2.6.0</string>
+	<string>2.6.5</string>
 	<key>CFBundleSignature</key>
 	<string>????</string>
 	<key>CFBundleVersion</key>
-	<string>2.6.0</string>
+	<string>2.6.5</string>
 	<key>IOKitPersonalities</key>
 	<dict>
 		<key>Generic Keyboard</key>
@@ -1590,7 +1590,7 @@
 	<key>CFBundleExecutable</key>
 	<string>AppleUSBUHCI</string>
 	<key>CFBundleGetInfoString</key>
-	<string>2.6.0, Copyright © 2004-2006 Apple Computer Inc., All Rights Reserved</string>
+	<string>2.7.0, Copyright © 2004-2006 Apple Computer Inc., All Rights Reserved</string>
 	<key>CFBundleIconFile</key>
 	<string></string>
 	<key>CFBundleIdentifier</key>
@@ -1602,11 +1602,11 @@
 	<key>CFBundlePackageType</key>
 	<string>KEXT</string>
 	<key>CFBundleShortVersionString</key>
-	<string>2.6.0</string>
+	<string>2.7.0</string>
 	<key>CFBundleSignature</key>
 	<string>????</string>
 	<key>CFBundleVersion</key>
-	<string>2.6.0</string>
+	<string>2.7.0</string>
 	<key>IOKitPersonalities</key>
 	<dict>
 		<key>AppleUSBUHCI</key>
@@ -1665,7 +1665,7 @@
 	<key>CFBundleExecutable</key>
 	<string>IOUSBCompositeDriver</string>
 	<key>CFBundleGetInfoString</key>
-	<string>2.6.1, Copyright © 2000-2006 Apple Computer Inc., All Rights Reserved</string>
+	<string>2.6.5, Copyright © 2000-2006 Apple Computer Inc., All Rights Reserved</string>
 	<key>CFBundleIconFile</key>
 	<string></string>
 	<key>CFBundleIdentifier</key>
@@ -1677,11 +1677,11 @@
 	<key>CFBundlePackageType</key>
 	<string>KEXT</string>
 	<key>CFBundleShortVersionString</key>
-	<string>2.6.1</string>
+	<string>2.6.5</string>
 	<key>CFBundleSignature</key>
 	<string>????</string>
 	<key>CFBundleVersion</key>
-	<string>2.6.1</string>
+	<string>2.6.5</string>
 	<key>IOKitPersonalities</key>
 	<dict>
 		<key>AppleUSBPrinterDevice0</key>
@@ -2032,7 +2032,7 @@
 	<key>CFBundleExecutable</key>
 	<string>AppleUSBEHCI</string>
 	<key>CFBundleGetInfoString</key>
-	<string>2.6.1, Copyright © 2000-2006 Apple Computer Inc., All Rights Reserved</string>
+	<string>2.7.0, Copyright © 2000-2007 Apple Inc., All Rights Reserved</string>
 	<key>CFBundleIconFile</key>
 	<string></string>
 	<key>CFBundleIdentifier</key>
@@ -2044,11 +2044,11 @@
 	<key>CFBundlePackageType</key>
 	<string>KEXT</string>
 	<key>CFBundleShortVersionString</key>
-	<string>2.6.1</string>
+	<string>2.7.0</string>
 	<key>CFBundleSignature</key>
 	<string>????</string>
 	<key>CFBundleVersion</key>
-	<string>2.6.1</string>
+	<string>2.7.0</string>
 	<key>IOKitPersonalities</key>
 	<dict>
 		<key>AppleUSBEHCI</key>

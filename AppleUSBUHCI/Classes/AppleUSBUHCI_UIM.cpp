@@ -236,7 +236,7 @@ AppleUSBUHCI::UIMCreateControlTransfer(short				functionNumber,
 	// that it's a multi-part transaction, and this is not the last part of the transaction,
 	// assemble the parts in a queue but don't start it yet.
     
-    USBLog(6, "AppleUSBUHCI[%p]::UIMCreateControlTransfer - allocating TD chain with CBP %p", this, CBP);
+    USBLog(7, "AppleUSBUHCI[%p]::UIMCreateControlTransfer - allocating TD chain with CBP %p", this, CBP);
     status = AllocTDChain(pQH, command, CBP, bufferSize, direction, true);
     if (status != kIOReturnSuccess) 
 	{
@@ -670,7 +670,9 @@ AppleUSBUHCI::DeleteIsochEP(IOUSBControllerIsochEndpoint* pEP)
 IOReturn
 AppleUSBUHCI::CreateIsochTransfer(IOUSBControllerIsochEndpoint* pEP, IOUSBIsocCommand *command)
 {
-    AppleUHCIIsochTransferDescriptor		*pNewITD=NULL;
+    AppleUHCIIsochTransferDescriptor		*pNewITD = NULL;
+    AppleUHCIIsochTransferDescriptor		*pTempTDList = NULL;
+    AppleUHCIIsochTransferDescriptor		*pTempTDListEnd = NULL;
     UInt64									maxOffset;
     UInt64									curFrameNumber = GetFrameNumber();
     UInt64									frameDiff;
@@ -696,6 +698,7 @@ AppleUSBUHCI::CreateIsochTransfer(IOUSBControllerIsochEndpoint* pEP, IOUSBIsocCo
 	IODMACommand::Segment64					segments64;
 	UInt32									numSegments;
 	IOReturn								status;
+	IOReturn								ret = kIOReturnSuccess;
 	
     USBLog(7, "AppleUSBUHCI[%p]::CreateIsochTransfer - frameCount %ld - frameNumberStart %Ld - curFrameNumber %Ld", this, frameCount, frameNumberStart, curFrameNumber);
     USBLog(7, "AppleUSBUHCI[%p]::CreateIsochTransfer - updateFrequency %ld - lowLatency %d", this, updateFrequency, lowLatency);
@@ -800,7 +803,7 @@ AppleUSBUHCI::CreateIsochTransfer(IOUSBControllerIsochEndpoint* pEP, IOUSBIsocCo
 		else
 			reqCount = pFrames[i].frReqCount;
 	    
-        USBLog(7, "AppleUSBUHCI[%p]::CreateIsochTransfer - new iTD %p size (%d)", this, pNewITD, reqCount);
+        USBLog(7, "AppleUSBUHCI[%p]::CreateIsochTransfer - new iTD %p size (frameCount: %ld, reqCout: %d)", this, pNewITD, i, reqCount);
         if (!pNewITD)
         {
             USBLog(1,"AppleUSBUHCI[%p]::CreateIsochTransfer Could not allocate a new iTD", this);
@@ -826,6 +829,7 @@ AppleUSBUHCI::CreateIsochTransfer(IOUSBControllerIsochEndpoint* pEP, IOUSBIsocCo
 		{
 			dmaStartAddr = (IOPhysicalAddress)segments64.fIOVMAddr;
 			segLen = (UInt32)segments64.fLength;
+			USBLog(5, "AppleUSBUHCI[%p]::CreateIsochTransfer - gen64IOVMSegments:  addr: %p, segLen: %ld", this, (void*)dmaStartAddr, segLen);
 		}			
 
 		// TODO - use an alignment buffer if necessary for this frame
@@ -842,11 +846,11 @@ AppleUSBUHCI::CreateIsochTransfer(IOUSBControllerIsochEndpoint* pEP, IOUSBIsocCo
 			{
 				//  If we run out of alignment buffers, we need to return an error and unravel the TDs that we have created for this transfer.  That will need to wait until
 				//  rdar://4595324.  For now, just break out of the loop while adjusting the reqCount. This will cause errors in the stream, but we won't panic.
-				USBLog(1, "AppleUSBUHCI[%p]:CreateIsochTransfer - could not get the alignment buffer I needed", this);
+				USBLog(1, "AppleUSBUHCI[%p]:CreateIsochTransfer - could not get the alignment buffer I needed for frameCount %ld.  Setting reqCount = to segLen (%ld)", this, i, segLen);
 				USBError(1,"The USB UHCI driver could not get the resources it needed.  Transfers will be affected (%d:%d)", command->GetAddress(), command->GetEndpoint());
 				reqCount = segLen;
-				// return kIOReturnNoResources;
-				break;
+				ret = kIOReturnNoResources;
+				goto ErrorExit;
 			}
 			
 			USBLog(6, "AppleUSBUHCI[%p]:CreateIsochTransfer - using alignment buffer %p at pPhysical %p instead of %p direction %s EP %d", this, (void*)bp->vaddr, (void*)bp->paddr, (void*)dmaStartAddr, (pEP->direction == kUSBOut) ? "OUT" : "IN", pEP->endpointNumber);
@@ -899,11 +903,65 @@ AppleUSBUHCI::CreateIsochTransfer(IOUSBControllerIsochEndpoint* pEP, IOUSBIsocCo
 		
 		pNewITD->_requestFromRosettaClient = command->GetIsRosettaClient();
 		
-		PutTDonToDoList(pEP, pNewITD);
+		USBLog(2, "AppleUSBUHCI[%p]::CreateIsochTransfer - adding TD (%p) to temporary list (%p)", this, pNewITD, pTempTDList);
+		// instead of adding to the ToDo list, just use a local temporary list for now
+		if(pTempTDList == NULL)
+		{
+			// as the head of a new list
+			pTempTDList = pNewITD;
+		}
+		else
+		{
+			// at the tail of the old list
+			pTempTDListEnd->_logicalNext = pNewITD;
+		}
+		// no matter what we are the new tail
+		pTempTDListEnd = pNewITD;
     }
+
+	// we got through the list successfully. transfer to the tempTDList to the ToDoList
+	while (pTempTDList)
+	{
+		pNewITD = pTempTDList;
+		pTempTDList = (AppleUHCIIsochTransferDescriptor*)pTempTDList->_logicalNext;
+		pNewITD->_logicalNext = NULL;
+		USBLog(6, "AppleUSBUHCI[%p]::CreateIsochTransfer - putting TD (%p) on EP (%p)", this, pNewITD, pEP);
+		PutTDonToDoList(pEP, pNewITD);
+	}
 	USBLog(7, "AppleUSBUHCI[%p]::CreateIsochTransfer - calling AddIsochFramesToSchedule", this);
 	AddIsochFramesToSchedule(pEP);
 	return kIOReturnSuccess;
+	
+ErrorExit:
+	    
+	USBLog(1, "AppleUSBUHCI[%p]::CreateIsochTransfer - Err (%p) - returning temporary TDs", this, (void*)ret);
+	while (pTempTDList)
+	{
+		pNewITD = pTempTDList;
+		pTempTDList = (AppleUHCIIsochTransferDescriptor*)pTempTDList->_logicalNext;
+		pNewITD->_logicalNext = NULL;			
+		if (pNewITD && pNewITD->alignBuffer)
+		{
+			if (pEP->direction == kUSBOut)
+			{
+				USBLog(5, "AppleUSBUHCI[%p]::PutTDonDoneQueue - found alignment buffer on Isoch OUT (%p) - freeing", this, pNewITD->alignBuffer);
+				ReleaseIsochAlignmentBuffer(pNewITD->alignBuffer);
+			}
+			else if (pNewITD->alignBuffer->dmaCommand)
+			{
+				// put these in the dma command to be copied when the dmaCommand is completed
+				USBLog(5, "AppleUSBUHCI[%p]::PutTDonDoneQueue - found alignment buffer on Isoch IN (%p) - storing in dmacommand (%p)", this, pNewITD->alignBuffer, pNewITD->alignBuffer->dmaCommand);
+				queue_enter(&pNewITD->alignBuffer->dmaCommand->_alignment_buffers, pNewITD->alignBuffer, UHCIAlignmentBuffer *, chain);
+			}
+			pNewITD->alignBuffer = NULL;
+		}
+		if ( pNewITD )
+		{
+			pNewITD->Deallocate(this);
+		}
+	}
+	
+	return ret;
 }
 
 
@@ -1317,47 +1375,10 @@ AppleUSBUHCI::UIMCheckForTimeouts(void)
 	IOPhysicalAddress				pTDPhys;
     UInt32							noDataTimeout;
     UInt32							completionTimeout;
-    UInt32							curFrame = GetFrameNumber32();
+    UInt32							curFrame;
 	UInt32							rem;
 	bool							logging = false;
 	int								loopCount = 0;
-	
-
-	if (_needToCreateRootHub)
-	{
-		USBLog(1,"AppleUSBUHCI[%p]::UIMCheckForTimeouts - Need to recreate root hub on bus %ld INTR[%p] _uhciBusState[%d] _uhciAvailable[%s], sleeping for 5 seconds", this, _busNumber, (void*)ioRead16(kUHCI_INTR), _uhciBusState, _uhciAvailable ? "true" : "false");
-		_needToCreateRootHub = false;
-		
-		IOSleep(5000);  // Sleep for 5s
-		
-		USBLog(2,"AppleUSBUHCI[%p]::UIMCheckForTimeouts -  Need to recreate root hub on bus %ld, powering up hardware", this, _busNumber);
-		
-		// Initialize our hardware
-		//
-		UIMInitializeForPowerUp();
-		_uhciAvailable = true;										// tell the interrupt filter routine that we are on
-		Run(true);
-		_uhciBusState = kUHCIBusStateRunning;
-		_wakingFromHibernation = false;
-		
-		if ( _rootHubDevice == NULL )
-		{
-			IOReturn err;
-			
-			err = CreateRootHubDevice( _device, &_rootHubDevice );
-			if ( err != kIOReturnSuccess )
-			{
-				USBError(1,"AppleUSBUHCI[%p]::UIMCheckForTimeouts -  Could not create root hub device upon wakeup (%x)!", this, err);
-			}
-			else
-			{
-				USBLog(2,"AppleUSBUHCI[%p]::UIMCheckForTimeouts -  calling registerService on new root hub", this);
-				_rootHubDevice->registerService(kIOServiceRequired | kIOServiceSynchronous);
-			}
-		}
-		USBLog(1,"AppleUSBUHCI[%p]::UIMCheckForTimeouts - done creating root hub on bus %ld INTR[%p] _uhciBusState[%d] _uhciAvailable[%s]", this, _busNumber, (void*)ioRead16(kUHCI_INTR), _uhciBusState, _uhciAvailable ? "true" : "false");
-		return;				// nothing else to do if we are just creating the root hub
-	}
 	
     if (isInactive() || (_uhciBusState != kUHCIBusStateRunning) || _wakingFromHibernation)
 	{
@@ -1448,6 +1469,7 @@ AppleUSBUHCI::UIMCheckForTimeouts(void)
 		
 		noDataTimeout = pTD->command->GetNoDataTimeout();
 		completionTimeout = pTD->command->GetCompletionTimeout();
+		curFrame = GetFrameNumber32();
 		
 		if (completionTimeout)
 		{
@@ -2045,7 +2067,7 @@ AppleUSBUHCI::AddIsochFramesToSchedule(IOUSBControllerIsochEndpoint* pEP)
 				_outSlot = firstOutSlot;
 			}
 			// Place TD in list
-			USBLog(7, "AppleUSBUHCI[%p]::AddIsochFramesToSchedule - linking TD (%p) with frame (0x%Ld) into slot (0x%x) - curr next log (%p) phys (%p)", this, pTD, pTD->_frameNumber, pEP->inSlot, _logicalFrameList[pEP->inSlot], (void*)USBToHostLong(_frameList[pEP->inSlot]));
+			//USBLog(7, "AppleUSBUHCI[%p]::AddIsochFramesToSchedule - linking TD (%p) with frame (0x%Ld) into slot (0x%x) - curr next log (%p) phys (%p)", this, pTD, pTD->_frameNumber, pEP->inSlot, _logicalFrameList[pEP->inSlot], (void*)USBToHostLong(_frameList[pEP->inSlot]));
 			pTD->print(7);
 			
 			pTD->SetPhysicalLink(USBToHostLong(_frameList[pEP->inSlot]));

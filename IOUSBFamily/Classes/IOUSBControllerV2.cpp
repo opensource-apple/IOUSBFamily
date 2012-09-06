@@ -759,7 +759,7 @@ IOUSBControllerV2::ReadV2(IOMemoryDescriptor *buffer, USBDeviceAddress address, 
 			nullCompletion = command->GetDisjointCompletion();
 			if (nullCompletion.action)
 			{
-				USBLog(6, "%s[%p]::ReadV2 - SYNC xfer or immediate error with Disjoint Completion", getName(), this);
+				USBLog(1, "%s[%p]::ReadV2 - SYNC xfer or immediate error with Disjoint Completion", getName(), this);
 			}
 			if (memDesc)
 			{

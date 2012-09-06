@@ -2,7 +2,7 @@
  *
  * @APPLE_LICENSE_HEADER_START@
  * 
- * Copyright (c) 1998-2003 Apple Computer, Inc.  All Rights Reserved.
+ * Copyright (c) 1998-2007 Apple Inc.  All Rights Reserved.
  * 
  * This file contains Original Code and/or Modifications of Original Code
  * as defined in and that are subject to the Apple Public Source License
@@ -239,12 +239,12 @@ AppleEHCIIsochTransferDescriptor::UpdateFrameList(AbsoluteTime timeStamp)
 		if (!framesInTD)
 			break;
 		
-	    statusWord = USBToHostLong(*(TransactionP++));
+	    statusWord = USBToHostLong(TransactionP[i]);
+
 		if (_lowLatency)
 			pActCount = &(pLLFrames[_frameIndex + j].frActCount);
 		else
 			pActCount = &(pFrames[_frameIndex + j].frActCount);
-		
 	    frStatus = mungeEHCIStatus(statusWord, pActCount,  _pEndpoint->maxPacketSize,  _pEndpoint->direction);
 
 	    if(frStatus != kIOReturnSuccess)

@@ -261,6 +261,7 @@ AppleUSBEHCI::setPowerState( unsigned long powerStateOrdinal, IOService* whatDev
     if ( powerStateOrdinal == kEHCISetPowerLevelSuspend ) 
     {
 		// disable the interrupt
+		_companionWakeHoldoff = true;						// from this point on, don't allow companion controllers to wake up until we have
 		
 		USBLog(5, "AppleUSBEHCI::setPowerState - disabling interrupt before suspending bus");
 		_savedUSBIntr = _pEHCIRegisters->USBIntr;			// save currently enabled interrupts
@@ -354,9 +355,11 @@ AppleUSBEHCI::setPowerState( unsigned long powerStateOrdinal, IOService* whatDev
 			// SuspendUSBBus();
 			// _ehciAvailable = false;					// tell the interrupt filter routine that we are off
 			
-			USBLog(2,"AppleUSBEHCI[%p]::setPowerState - setting _needToCreateRootHub", this);
-			_needToCreateRootHub = true;
+			IOSleep(50);								// this appears to the devices as a reset, so wait the required 50 ms
+			USBLog(2,"AppleUSBEHCI[%p]::setPowerState - spawning root hub creation thread", this);
+			thread_call_enter(_rootHubCreationThread);
 			goto done;
+			// we will clear _companionWakeHoldoff when we are done creating the EHCI root hub
 		}
 		
         // If we were just idle suspended, we did not unload the UIM, so we need to check that here
@@ -432,6 +435,7 @@ AppleUSBEHCI::setPowerState( unsigned long powerStateOrdinal, IOService* whatDev
             _ehciBusState = kEHCIBusStateRunning;
         }
 				
+		_companionWakeHoldoff = false;
         LastRootHubPortStatusChanged(true);
         _idleSuspend = false;
     }
@@ -963,7 +967,8 @@ static bool HasExpressCardUSB( IORegistryEntry * acpiDevice, UInt32 * portnum )
 // Checks for ExpressCard connected to this controller, and returns the port number (1 based)
 // Will return 0 if no ExpressCard is connected to this controller.
 //
-UInt32 AppleUSBEHCI::ExpressCardPort( IOService * provider )
+UInt32 
+AppleUSBEHCI::ExpressCardPort( IOService * provider )
 {
 	IOACPIPlatformDevice *	acpiDevice;
 	UInt32					portNum = 0;
@@ -979,3 +984,27 @@ UInt32 AppleUSBEHCI::ExpressCardPort( IOService * provider )
 }
 
 
+
+void
+AppleUSBEHCI::SynchronizeCompanionRootHub(IOUSBControllerV2* companion)
+{
+	int		i = 0;
+	
+	USBLog(4, "AppleUSBEHCI[%p]::SynchronizeCompanionRootHub for %s companion[%p]", this, companion->getName(), companion);
+	if (!_companionWakeHoldoff)
+	{
+		USBLog(2, "AppleUSBEHCI[%p]::SynchronizeCompanionRootHub - no holdoff needed", this);
+	}
+	else
+	{
+		while (_companionWakeHoldoff)
+		{
+			if ((i++ % 1000) == 0)
+			{
+				USBLog(2, "AppleUSBEHCI[%p]::SynchronizeCompanionRootHub - waiting on behalf of companion[%p]", this, companion);
+			}
+			IOSleep(10);		// wait for 10 milliseconds before checking again
+		}
+		USBLog(2, "AppleUSBEHCI[%p]::SynchronizeCompanionRootHub - companion[%p] is ready to go!!", this, companion);
+	}
+}

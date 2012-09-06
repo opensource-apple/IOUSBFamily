@@ -75,23 +75,30 @@ AppleUSBUHCI::init(OSDictionary * propTable)
     //KernelDebugSetLevel(5);
     //USBLog(3, "AppleUSBUHCI[%p]::init", this);
 	
-    _uhciBusState = kUHCIBusStateOff;
-    _uhciAvailable = true;
     USBLog(7, "AppleUSBUHCI::init: %s", _deviceName);
     
     _intLock = IOLockAlloc();
     if (!_intLock)
-        return(false);
+		goto ErrorExit;
 	
     _wdhLock = IOSimpleLockAlloc();
     if (!_wdhLock)
-        return(false);
+		goto ErrorExit;
 	
 	_isochScheduleLock = IOSimpleLockAlloc();
     if (!_isochScheduleLock)
-        return(false);
+		goto ErrorExit;
+	
+	// Allocate a thread call to create the root hub
+	_rootHubCreationThread = thread_call_allocate((thread_call_func_t)RootHubCreationEntry, (thread_call_param_t)this);
+	
+	if ( !_rootHubCreationThread)
+		goto ErrorExit;
 	
     _uimInitialized = false;
+    _uhciBusState = kUHCIBusStateOff;
+    _uhciAvailable = true;
+    _controllerSpeed = kUSBDeviceSpeedFull;	
 	
     // Initialize our consumer and producer counts.  
     //
@@ -99,6 +106,19 @@ AppleUSBUHCI::init(OSDictionary * propTable)
     _consumerCount = 1;
     
     return true;
+
+ErrorExit:
+		
+	if (_intLock)
+		IOLockFree(_intLock);
+	
+	if ( _wdhLock )
+		IOSimpleLockFree(_wdhLock);
+	
+	if (_isochScheduleLock)
+		IOSimpleLockFree(_isochScheduleLock);
+	
+	return false;
 }
 
 
@@ -106,53 +126,15 @@ AppleUSBUHCI::init(OSDictionary * propTable)
 bool
 AppleUSBUHCI::start( IOService * provider )
 {
-	OSIterator				*siblings = NULL;
-    mach_timespec_t			t;
-    OSDictionary			*matching;
-    IOService				*service;
-    IORegistryEntry			*entry;
-    bool					ehciPresent = false;
-    
-    // Check my provide (_device) parent (a PCI bridge) children (sibling PCI functions)
-    // to see if any of them is an EHCI controller - if so, wait for it..
-    
-	if (provider)
-		siblings = provider->getParentEntry(gIOServicePlane)->getChildIterator(gIOServicePlane);
+	// before we actually start the controller, we need to check for an EHCI controller
+    CheckForEHCIController(provider);
 	
-	if( siblings ) 
-	{
-		while( (entry = OSDynamicCast(IORegistryEntry, siblings->getNextObject())))
-		{
-			UInt32			classCode;
-			OSData			*obj = OSDynamicCast(OSData, entry->getProperty("class-code"));
-			if (obj) 
-			{
-				classCode = *(UInt32 *)obj->getBytesNoCopy();
-				if (classCode == 0x0c0320) 
-				{
-					ehciPresent = true;
-					break;
-				}
-			}
-		}
-		siblings->release();
-	}
-	
-    if (ehciPresent) 
-	{
-        t.tv_sec = 5;
-        t.tv_nsec = 0;
-        USBLog(7, "AppleUSBUHCI[%p]::start waiting for EHCI", this);
-		setProperty("Companion", "yes");
-        service = waitForService( serviceMatching("AppleUSBEHCI"), &t );
-        USBLog(7, "AppleUSBUHCI[%p]::start got EHCI service %p", this, service);
-    }
-    
 	// Set a property indicating that we need contiguous memory for isoch transfers
 	//
 	setProperty(kUSBControllerNeedsContiguousMemoryForIsoch, kOSBooleanTrue);
 	
     USBLog(7, "AppleUSBUHCI[%p]::start", this);
+	// this is a call to IOUSBControllerV2::start, which will in turn call UIMInitialize, which is where most of our work is done
     if (!super::start(provider)) 
 	{
         return false;
@@ -169,6 +151,13 @@ void
 AppleUSBUHCI::stop( IOService * provider )
 {
     USBLog(3, "AppleUSBUHCI[%p]::stop", this);
+	if (_ehciController)
+	{
+		// we retain this so that we have a valid copy in case of sleep/wake
+		// once we stop we will no longer sleep/wake, so we can release it
+		_ehciController->release();
+		_ehciController = NULL;
+	}
     super::stop(provider);
 }
 
@@ -2339,4 +2328,139 @@ AppleUSBUHCI::PrintFrameList(UInt32 slot, int level)
 		}
 		pLE = pLE->_logicalNext;
 	}
+}
+
+
+
+IOReturn
+AppleUSBUHCI::CheckForEHCIController(IOService *provider)
+{
+	OSIterator				*siblings = NULL;
+	OSIterator				*ehciList = NULL;
+    mach_timespec_t			t;
+    OSDictionary			*matching;
+    IOService				*service;
+    IORegistryEntry			*entry;
+    bool					ehciPresent = false;
+	const char *			myProviderLocation;
+	const char *			ehciProviderLocation;
+	int						myDeviceNum = 0, myFnNum = 0;
+	int						ehciDeviceNum = 0, ehciFnNum = 0;
+	AppleUSBEHCI *			testEHCI;
+	int						checkListCount = 0;
+    
+    // Check my provide (_device) parent (a PCI bridge) children (sibling PCI functions)
+    // to see if any of them is an EHCI controller - if so, wait for it..
+    
+	if (provider)
+	{
+		siblings = provider->getParentEntry(gIOServicePlane)->getChildIterator(gIOServicePlane);
+		myProviderLocation = provider->getLocation();
+		if (myProviderLocation)
+		{
+			super::ParsePCILocation(myProviderLocation, &myDeviceNum, &myFnNum);
+		}
+	}
+	else
+	{
+		USBLog(2, "AppleUSBUHCI[%p]::CheckForEHCIController - NULL provider", this);
+	}
+	
+	if( siblings ) 
+	{
+		while( (entry = OSDynamicCast(IORegistryEntry, siblings->getNextObject())))
+		{
+			UInt32			classCode;
+			OSData			*obj = OSDynamicCast(OSData, entry->getProperty("class-code"));
+			if (obj) 
+			{
+				classCode = *(UInt32 *)obj->getBytesNoCopy();
+				if (classCode == 0x0c0320) 
+				{
+					ehciPresent = true;
+					break;
+				}
+			}
+		}
+		siblings->release();
+	}
+	else
+	{
+		USBLog(2, "AppleUSBUHCI[%p]::CheckForEHCIController - NULL siblings", this);
+	}
+	
+
+    if (ehciPresent) 
+	{
+        t.tv_sec = 5;
+        t.tv_nsec = 0;
+        USBLog(7, "AppleUSBUHCI[%p]::CheckForEHCIController calling waitForService for AppleUSBEHCI", this);
+        service = waitForService( serviceMatching("AppleUSBEHCI"), &t );
+		testEHCI = (AppleUSBEHCI*)service;
+		while (testEHCI)
+		{
+			ehciProviderLocation = testEHCI->getParentEntry(gIOServicePlane)->getLocation();
+			if (ehciProviderLocation)
+			{
+				super::ParsePCILocation(ehciProviderLocation, &ehciDeviceNum, &ehciFnNum);
+			}
+			if (myDeviceNum == ehciDeviceNum)
+			{
+				USBLog(2, "AppleUSBUHCI[%p]::CheckForEHCIController - ehciDeviceNum and myDeviceNum match (%d)", this, myDeviceNum);
+				_ehciController = testEHCI;
+				_ehciController->retain();
+				USBLog(7, "AppleUSBUHCI[%p]::CheckForEHCIController got EHCI service %p", this, service);
+				setProperty("Companion", "yes");
+				break;
+			}
+			else
+			{
+				// we found an instance of EHCI, but it doesn't appear to be ours, so now I need to see how many there are in the system
+				// and see if any of them matches
+				USBLog(2, "AppleUSBUHCI[%p]::CheckForEHCIController - ehciDeviceNum(%d) and myDeviceNum(%d) do NOT match", this, ehciDeviceNum, myDeviceNum);
+				if (ehciList)
+				{
+					testEHCI = (AppleUSBEHCI*)(ehciList->getNextObject());
+					if (testEHCI)
+					{
+						USBLog(2, "AppleUSBUHCI[%p]::CheckForEHCIController - got AppleUSBEHCI[%p] from the list", this, testEHCI);
+					}
+				}
+				else
+				{
+					testEHCI = NULL;
+				}
+				
+				if (!testEHCI && (checkListCount++ < 2))
+				{
+					if (ehciList)
+						ehciList->release();
+						
+					if (checkListCount == 2)
+					{
+						USBLog(2, "AppleUSBUHCI[%p]::CheckForEHCIController - waiting for 5 seconds", this);
+						IOSleep(5000);				// wait 5 seconds the second time around
+					}
+
+					USBLog(2, "AppleUSBUHCI[%p]::CheckForEHCIController - getting an AppleUSBEHCI list", this);
+					ehciList = getMatchingServices(serviceMatching("AppleUSBEHCI"));
+					if (ehciList)
+					{
+						testEHCI = (AppleUSBEHCI*)(ehciList->getNextObject());
+						if (testEHCI)
+						{
+							USBLog(2, "AppleUSBUHCI[%p]::CheckForEHCIController - got AppleUSBEHCI[%p] from the list", this, testEHCI);
+						}
+					}
+				}
+			}
+		}
+    }
+	else
+	{
+		USBLog(2, "AppleUSBUHCI[%p]::CheckForEHCIController - EHCI controller not found in siblings", this);
+	}
+	if (ehciList)
+		ehciList->release();
+	return kIOReturnSuccess;
 }

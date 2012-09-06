@@ -39,6 +39,7 @@
 
 #include "USBOHCI.h"
 #include "USBOHCIRootHub.h"
+#include "AppleUSBEHCI.h"
 
 #define USB_CONSTANT16(x)	(OSSwapHostToLittleConstInt16(x))
 #define MICROSECOND		(1)
@@ -59,10 +60,10 @@ __attribute__((format(printf, 1, 2)));
 #ifdef __ppc__
 #define IOSync eieio
 #else
-#define IOSync()
+#define IOSync() __asm__ __volatile__ ( "mfence" : : : "memory" )
 #endif
 
-struct InterruptTransaction 
+struct OHCIRHInterruptTransaction 
 {
     IOMemoryDescriptor *	buf;
     UInt32					bufLen;
@@ -161,84 +162,86 @@ private:
 
 protected:
 
-    IOPCIDevice *								_device;
-    IOMemoryMap *								_deviceBase;
-    AppleOHCIGeneralTransferDescriptorPtr 		_pendingHead;
-    AppleOHCIGeneralTransferDescriptorPtr		_pendingTail;
-    UInt16										_vendorID;
-    UInt16										_deviceID;
-    UInt16										_revisionID;
-    UInt32										_errataBits;			// various bits for chip erratas
-    OHCIRegistersPtr							_pOHCIRegisters;		// Pointer to base address of OHCI registers.
-    Ptr											_pHCCA;					// Pointer to HCCA.
-    AppleOHCIIntHead							_pInterruptHead[63];	// ptr to private list of all interrupts heads 			
-    volatile AppleOHCIEndpointDescriptorPtr		_pIsochHead;			// ptr to Isochronous list head
-    volatile AppleOHCIEndpointDescriptorPtr		_pIsochTail;			// ptr to Isochronous list tail
-    volatile AppleOHCIEndpointDescriptorPtr		_pBulkHead;				// ptr to Bulk list
-    volatile AppleOHCIEndpointDescriptorPtr		_pControlHead;			// ptr to Control list
-    volatile AppleOHCIEndpointDescriptorPtr		_pBulkTail;				// ptr to Bulk list
-    volatile AppleOHCIEndpointDescriptorPtr		_pControlTail;			// ptr to Control list
-    volatile AppleOHCIGeneralTransferDescriptorPtr	_pFreeTD;			// list of availabble Trasfer Descriptors
+    IOPCIDevice *										_device;
+    IOMemoryMap *										_deviceBase;
+    AppleOHCIGeneralTransferDescriptorPtr				_pendingHead;
+    AppleOHCIGeneralTransferDescriptorPtr				_pendingTail;
+    UInt16												_vendorID;
+    UInt16												_deviceID;
+    UInt16												_revisionID;
+    UInt32												_errataBits;			// various bits for chip erratas
+    OHCIRegistersPtr									_pOHCIRegisters;		// Pointer to base address of OHCI registers.
+    Ptr													_pHCCA;					// Pointer to HCCA.
+    AppleOHCIIntHead									_pInterruptHead[63];	// ptr to private list of all interrupts heads 			
+    volatile AppleOHCIEndpointDescriptorPtr				_pIsochHead;			// ptr to Isochronous list head
+    volatile AppleOHCIEndpointDescriptorPtr				_pIsochTail;			// ptr to Isochronous list tail
+    volatile AppleOHCIEndpointDescriptorPtr				_pBulkHead;				// ptr to Bulk list
+    volatile AppleOHCIEndpointDescriptorPtr				_pControlHead;			// ptr to Control list
+    volatile AppleOHCIEndpointDescriptorPtr				_pBulkTail;				// ptr to Bulk list
+    volatile AppleOHCIEndpointDescriptorPtr				_pControlTail;			// ptr to Control list
+    volatile AppleOHCIGeneralTransferDescriptorPtr		_pFreeTD;			// list of availabble Trasfer Descriptors
     volatile AppleOHCIIsochTransferDescriptorPtr		_pFreeITD;		// list of availabble Trasfer Descriptors
-    volatile AppleOHCIEndpointDescriptorPtr		_pFreeED;				// list of available Endpoint Descriptors
-    volatile AppleOHCIGeneralTransferDescriptorPtr	_pLastFreeTD;		// last of availabble Trasfer Descriptors
+    volatile AppleOHCIEndpointDescriptorPtr				_pFreeED;				// list of available Endpoint Descriptors
+    volatile AppleOHCIGeneralTransferDescriptorPtr		_pLastFreeTD;		// last of availabble Trasfer Descriptors
     volatile AppleOHCIIsochTransferDescriptorPtr		_pLastFreeITD;		// last of availabble Trasfer Descriptors
-    volatile AppleOHCIEndpointDescriptorPtr		_pLastFreeED;		// last of available Endpoint Descriptors
-    volatile AppleOHCIGeneralTransferDescriptorPtr	_pPendingTD;		// list of non processed Trasfer Descriptors
-    AppleUSBOHCIedMemoryBlock*				_edMBHead;		// head of a linked list of ED memory blocks				
-    AppleUSBOHCIgtdMemoryBlock*				_gtdMBHead;		// head of a linked list of GTD memory blocks				
-    AppleUSBOHCIitdMemoryBlock*				_itdMBHead;		// head of a linked list of ITD memory blocks				
+    volatile AppleOHCIEndpointDescriptorPtr				_pLastFreeED;		// last of available Endpoint Descriptors
+    volatile AppleOHCIGeneralTransferDescriptorPtr		_pPendingTD;		// list of non processed Trasfer Descriptors
+    AppleUSBOHCIedMemoryBlock*							_edMBHead;		// head of a linked list of ED memory blocks				
+    AppleUSBOHCIgtdMemoryBlock*							_gtdMBHead;		// head of a linked list of GTD memory blocks				
+    AppleUSBOHCIitdMemoryBlock*							_itdMBHead;		// head of a linked list of ITD memory blocks				
     struct  {
         volatile UInt32	scheduleOverrun;				// updated by the interrupt handler
         volatile UInt32	unrecoverableError;				// updated by the interrupt handler
         volatile UInt32	frameNumberOverflow;				// updated by the interrupt handler
         volatile UInt32	ownershipChange;				// updated by the interrupt handler
         } _errors;
-    volatile UInt64					_frameNumber;
-    UInt16						_rootHubFuncAddress;	// Function Address for the root hub
-    int							_OptiOn;
-    UInt32						_isochBandwidthAvail;	// amount of available bandwidth for Isochronous transfers
-    UInt32		 				_disablePortsBitmap;	// Bitmaps of ports that support port suspend even if they have an errata
-    UInt32						_dataAllocationSize;	// # of bytes allocated in for TD's
+    volatile UInt64							_frameNumber;
+    UInt16									_rootHubFuncAddress;	// Function Address for the root hub
+    int										_OptiOn;
+    UInt32									_isochBandwidthAvail;	// amount of available bandwidth for Isochronous transfers
+    UInt32									_disablePortsBitmap;	// Bitmaps of ports that support port suspend even if they have an errata
+    UInt32									_dataAllocationSize;	// # of bytes allocated in for TD's
     IOFilterInterruptEventSource *			_filterInterruptSource;
-    IOLock *						_intLock;
-    struct InterruptTransaction				_outstandingTrans[kMaxOutstandingTrans];
-    bool						_uimInitialized;
-    bool						_unloadUIMAcrossSleep;
-    bool						_onCardBus;
-    bool						_idleSuspend;
-    bool						_hasPCIPwrMgmt;
-    bool						_ohciAvailable;
-    IOPhysicalAddress 					_hccaPhysAddr;
-    UInt8						_ohciBusState;
-    AbsoluteTime					_lastCheckedTime;		// Last time we checked the Root Hub for inactivity
-    AbsoluteTime					_lastRootHubStatusChanged;	// Last time we had activity on the root hub
-    AbsoluteTime					_filterTimeStamp;
-    AbsoluteTime					_filterTimeStamp2;
-    UInt32						_lowLatencyIsochTDsProcessed;	// Number of low latency isoch TD's processed at primary interrupt time
-    UInt32						_filterInterruptCount;
-    UInt32						_framesUpdated;
-    UInt32						_framesError;
+    IOLock *								_intLock;
+    struct OHCIRHInterruptTransaction		_outstandingTrans[kMaxOutstandingTrans];
+    bool									_uimInitialized;
+    bool									_unloadUIMAcrossSleep;
+    bool									_onCardBus;
+    bool									_idleSuspend;
+    bool									_hasPCIPwrMgmt;
+    bool									_ohciAvailable;
+    IOPhysicalAddress						_hccaPhysAddr;
+    UInt8									_ohciBusState;
+    AbsoluteTime							_lastCheckedTime;		// Last time we checked the Root Hub for inactivity
+    AbsoluteTime							_lastRootHubStatusChanged;	// Last time we had activity on the root hub
+    AbsoluteTime							_filterTimeStamp;
+    AbsoluteTime							_filterTimeStamp2;
+    UInt32									_lowLatencyIsochTDsProcessed;	// Number of low latency isoch TD's processed at primary interrupt time
+    UInt32									_filterInterruptCount;
+    UInt32									_framesUpdated;
+    UInt32									_framesError;
     
     // Interrupt related fields
     //
-    UInt32						_resumeDetectedInterrupt;	// Set at primary interrupt time if we get that interrupt, cleared at secondary interrupt time
-    UInt32						_unrecoverableErrorInterrupt;	// Set at primary interrupt time if we get that interrupt, cleared at secondary interrupt time
-    UInt32						_rootHubStatusChangeInterrupt;	// Set at primary interrupt time if we get that interrupt, cleared at secondary interrupt time
-    UInt32						_writeDoneHeadInterrupt;	// Set at primary interrupt time if we get that interrupt, cleared at secondary interrupt time
+    UInt32									_resumeDetectedInterrupt;	// Set at primary interrupt time if we get that interrupt, cleared at secondary interrupt time
+    UInt32									_unrecoverableErrorInterrupt;	// Set at primary interrupt time if we get that interrupt, cleared at secondary interrupt time
+    UInt32									_rootHubStatusChangeInterrupt;	// Set at primary interrupt time if we get that interrupt, cleared at secondary interrupt time
+    UInt32									_writeDoneHeadInterrupt;	// Set at primary interrupt time if we get that interrupt, cleared at secondary interrupt time
     volatile IOPhysicalAddress				_savedDoneQueueHead;		// Physical address read from the done queue;
-    volatile UInt32					_producerCount;			// Counter used to synchronize reading of the done queue between filter (producer) and action (consumer)
-    volatile UInt32					_consumerCount;			// Counter used to synchronize reading of the done queue between filter (producer) and action (consumer)
-    IOSimpleLock *					_wdhLock;
-    UInt64						_timeElapsed;
-	bool									_needToCreateRootHub;					// True if we need to create the root hub post wake
+    volatile UInt32							_producerCount;			// Counter used to synchronize reading of the done queue between filter (producer) and action (consumer)
+    volatile UInt32							_consumerCount;			// Counter used to synchronize reading of the done queue between filter (producer) and action (consumer)
+    IOSimpleLock *							_wdhLock;
+    UInt64									_timeElapsed;
+    thread_call_t							_rootHubCreationThread;
 
     static void 				InterruptHandler(OSObject *owner,  IOInterruptEventSource * source, int count);
     static bool 				PrimaryInterruptFilter(OSObject *owner, IOFilterInterruptEventSource *source);
-    bool 					FilterInterrupt(int index);
+    bool						FilterInterrupt(int index);
+	static void					RootHubCreationEntry(OSObject *target);
+	void						RootHubCreation();
 
-    void					SetVendorInfo(void);
-    void					finishPending();
+    void						SetVendorInfo(void);
+    void						finishPending();
     IOReturn 					ControlInitialize(void);
     IOReturn 					BulkInitialize (void);
     IOReturn 					IsochronousInitialize(void);
@@ -246,9 +249,12 @@ protected:
 
     // callPlatformFunction symbols
     //
-    const OSSymbol *				_usb_remote_wakeup;
-    bool  					_remote_wakeup_occurred;
+    const OSSymbol *			_usb_remote_wakeup;
+    bool						_remote_wakeup_occurred;
     
+	// EHCI controller (if we are a companion)
+	AppleUSBEHCI						*_ehciController;
+	
     // Memory routines
     void										doCallback(AppleOHCIGeneralTransferDescriptorPtr nextTD, UInt32 transferStatus, UInt32 bufferSizeRemaining);
     UInt32 findBufferRemaining (AppleOHCIGeneralTransferDescriptorPtr pCurrentTD);
@@ -354,11 +360,13 @@ public:
     /*
      * UIM methods
      */
-    IOReturn UIMInitialize(IOService * provider);
-    IOReturn UIMFinalize();
-    IOReturn UIMInitializeForPowerUp();
-    IOReturn UIMFinalizeForPowerDown();
+    IOReturn		UIMInitialize(IOService * provider);
+    IOReturn		UIMFinalize();
+    IOReturn		UIMInitializeForPowerUp();
+    IOReturn		UIMFinalizeForPowerDown();
     
+	IOReturn		CheckForEHCIController(IOService*);
+
     // Control
     virtual IOReturn UIMCreateControlEndpoint(
             UInt8				functionNumber,

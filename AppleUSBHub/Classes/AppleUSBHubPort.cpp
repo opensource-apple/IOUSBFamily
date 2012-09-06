@@ -480,7 +480,7 @@ AppleUSBHubPort::RemoveDevice(void)
 IOReturn 
 AppleUSBHubPort::SuspendPort( bool suspend)
 {
-    IOReturn 		err = kIOReturnSuccess;
+    IOReturn			err = kIOReturnSuccess;
     IOUSBHubPortStatus	status;
       
     USBLog(5, "AppleUSBHubPort[%p]::SuspendPort(%d) for port %d", this, suspend, _portNum);
@@ -499,10 +499,15 @@ AppleUSBHubPort::SuspendPort( bool suspend)
         if (!suspend && !(status.statusFlags & kHubPortSuspend) )
         {
 			USBLog(5,"AppleUSBHubPort[%p]::SuspendPort Port was NOT suspended", this);
-           // We were trying to resume but the port was not supended.  Just ignore the
+           
+			// We were trying to resume but the port was not supended.  Just ignore the
             // request, but send a message
             if ( _portDevice )
-                _portDevice->message(kIOUSBMessagePortWasNotSuspended, NULL, &err);
+			{
+				_portDevice->retain();
+                _portDevice->message(kIOUSBMessagePortWasNotSuspended, _portDevice, NULL);
+				_portDevice->release();
+			}
             break;
         }
         
@@ -520,12 +525,23 @@ AppleUSBHubPort::SuspendPort( bool suspend)
                 // Callback device with the resume message
                 USBLog(3, "AppleUSBHubPort[%p]::SuspendPort Could not SetPortFeature (%d) (kUSBHubPortSuspendFeature): (0x%x)", this, _portNum, err);
                 if ( _portDevice )
-                    _portDevice->message(kIOUSBMessagePortHasBeenResumed, NULL, 0);
-
+				{
+					_portDevice->retain();
+                    _portDevice->message(kIOUSBMessagePortHasBeenResumed, _portDevice, NULL);
+					_portDevice->release();
+				}
+				err = kIOReturnSuccess;
             }
-            // Send a message to our device indicating that we completed the SetPortFeature
-            if ( _portDevice )
-                _portDevice->message(kIOUSBMessagePortHasBeenSuspended, NULL, &err);
+			else
+			{
+				// Send a message to our device indicating that we completed the SetPortFeature
+				if ( _portDevice )
+				{
+					_portDevice->retain();
+					_portDevice->message(kIOUSBMessagePortHasBeenSuspended, _portDevice, &err);
+					_portDevice->release();
+				}
+			}
         }
         else
         {
@@ -541,6 +557,14 @@ AppleUSBHubPort::SuspendPort( bool suspend)
 
     if ( err != kIOReturnSuccess )
     {
+		// Send a message to our device indicating that we got an error
+		if ( _portDevice )
+		{
+			_portDevice->retain();
+			_portDevice->message(kIOUSBMessagePortHasBeenSuspended, _portDevice, &err);
+			_portDevice->release();
+		}
+		
         // Set the handler back to default
         //
         SetPortVector(&AppleUSBHubPort::DefaultSuspendChangeHandler, kHubPortSuspend);
@@ -725,6 +749,14 @@ AppleUSBHubPort::ResetPort()
         _devZero = false;
     }
 
+	// If we are returning an error, then we need to tell the IOUSBDevice that we had an error
+    if (err && _portDevice)
+    {
+        USBLog(5, "AppleUSBHubPort[%p]::ResetPort - port %d, Sending kIOUSBMessagePortHasBeenReset message (0x%x)", this, _portNum, err);
+		_portDevice->retain();
+        _portDevice->message(kIOUSBMessagePortHasBeenReset, _portDevice, &err);
+		_portDevice->release();
+    }
     return err;
 }
 
@@ -1291,7 +1323,9 @@ AppleUSBHubPort::HandleResetPortHandler(UInt16 changeFlags, UInt16 statusFlags)
                     if ( _portDevice)
                     {
                         USBLog(5, "AppleUSBHubPort[%p]::HandleResetPortHandler - port %d, Sending kIOUSBMessagePortHasBeenReset message (0x%x)", this, _portNum, err);
-                        _portDevice->message(kIOUSBMessagePortHasBeenReset, NULL, &err);
+						_portDevice->retain();
+                        _portDevice->message(kIOUSBMessagePortHasBeenReset, _portDevice, &err);
+						_portDevice->release();
                     }
 					
                     // FatalError will remove the device if it exists
@@ -1311,7 +1345,9 @@ AppleUSBHubPort::HandleResetPortHandler(UInt16 changeFlags, UInt16 statusFlags)
                 {
                     err = kIOReturnNoDevice;
                     USBLog(5, "AppleUSBHubPort[%p]::HandleResetPortHandler - port %d, Sending kIOUSBMessagePortHasBeenReset message (0x%x)", this, _portNum, err);
-                    _portDevice->message(kIOUSBMessagePortHasBeenReset, NULL, &err);
+					_portDevice->retain();
+                    _portDevice->message(kIOUSBMessagePortHasBeenReset, _portDevice, &err);
+					_portDevice->release();
                 }
                 
                 return DetachDevice();
@@ -1422,8 +1458,10 @@ AppleUSBHubPort::HandleResetPortHandler(UInt16 changeFlags, UInt16 statusFlags)
     //
     if (_portDevice)
     {
-        _portDevice->message(kIOUSBMessagePortHasBeenReset, NULL, &err);
         USBLog(5, "AppleUSBHubPort[%p]::HandleResetPortHandler - port %d, Sending kIOUSBMessagePortHasBeenReset message (0x%x)", this, _portNum, err);
+		_portDevice->retain();
+		_portDevice->message(kIOUSBMessagePortHasBeenReset, _portDevice, &err);
+		_portDevice->release();
     }
     
     SetPortVector(&AppleUSBHubPort::DefaultResetChangeHandler, kHubPortBeingReset);
@@ -1439,7 +1477,9 @@ AppleUSBHubPort::HandleSuspendPortHandler(UInt16 changeFlags, UInt16 statusFlags
 
     // Send a message to the device that the port has been resumed
     //
-    _portDevice->message(kIOUSBMessagePortHasBeenResumed, NULL, 0);
+	_portDevice->retain();
+    _portDevice->message(kIOUSBMessagePortHasBeenResumed, _portDevice, 0);
+	_portDevice->release();
        
     return kIOReturnSuccess;
 }

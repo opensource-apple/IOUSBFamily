@@ -62,7 +62,8 @@ __attribute__((format(printf, 1, 2)));
 #define IOSync() __asm__ __volatile__ ( "mfence" : : : "memory" )
 #endif
 
-struct InterruptTransaction {
+struct EHCIRHInterruptTransaction 
+{
     IOMemoryDescriptor *		buf;
     UInt32						bufLen;
     IOUSBCompletion				completion;
@@ -219,9 +220,9 @@ protected:
 	UInt8									_periodicScheduleUnsynchCount;
     UInt32									_isochBandwidthAvail;					// amount of available bandwidth for Isochronous transfers
     UInt32									_periodicEDsInSchedule;					// interrupt endpoints
-    UInt64									_frameNumber;							// the current frame number
+    volatile UInt64							_frameNumber;							// the current frame number
     UInt16									_rootHubFuncAddress;					// Function Address for the root hub
-    struct InterruptTransaction				_outstandingTrans[kMaxOutstandingTrans];
+    struct EHCIRHInterruptTransaction		_outstandingTrans[kMaxOutstandingTrans];
     struct  {
         volatile UInt32	hostSystemError;				// updated by the interrupt handler
         volatile UInt32	unrecoverableError;				// updated by the interrupt handler
@@ -248,10 +249,11 @@ protected:
 	UInt32									_rhChangeBits[kMaxPorts];				// Change bits of the root hub
 	UInt32									_ExpressCardPort;						// port number (1-based) where we have an ExpressCard connector
     IONotifier *                            _powerDownNotifier;
-	bool									_needToCreateRootHub;					// True if we need to create the root hub post wake
 	bool									_gangedOvercurrent;						// True if our root hubs reports overcurrent on all ports
 	bool									_badExpressCardAttached;				// True if a driver has identified a bad ExpressCard
+	volatile bool							_companionWakeHoldoff;					// True if we need to hold of waking up companion controllers
 	thread_call_t							_portDetectInterruptThread;
+    thread_call_t							_rootHubCreationThread;
 	
 	// dealing with doneQueue reentrancy
 	UInt32									_nextDoneQueue;
@@ -263,34 +265,34 @@ protected:
     static bool 				PrimaryInterruptFilter(OSObject *owner, IOFilterInterruptEventSource *source);
 	static void 				PortDetectInterruptThreadEntry(OSObject *target);
 	void						PortDetectInterruptThread();
+	static void					RootHubCreationEntry(OSObject *target);
+	void						RootHubCreation();
 	
     bool						FilterInterrupt(int index);
 	
     void UIMRootHubStatusChange(void);
     void UIMRootHubStatusChange( bool abort );
 	
-    void SimulateRootHubInt(
-							UInt8					endpoint,
-							IOMemoryDescriptor * 			buf,
+    void SimulateRootHubInt(UInt8					endpoint,
+							IOMemoryDescriptor * 	buf,
 							UInt32 					bufLen,
-							IOUSBCompletion				completion);
+							IOUSBCompletion			completion);
 	
     void	SetVendorInfo(void);
-    AppleEHCIQueueHead *MakeEmptyEndPoint(
-										  UInt8 					functionAddress,
+    AppleEHCIQueueHead *MakeEmptyEndPoint(UInt8 				functionAddress,
 										  UInt8					endpointNumber,
-										  UInt16					maxPacketSize,
+										  UInt16				maxPacketSize,
 										  UInt8					speed,
-										  USBDeviceAddress				highSpeedHub,
-										  int						highSpeedPort,
+										  USBDeviceAddress		highSpeedHub,
+										  int					highSpeedPort,
 										  UInt8					direction);
-    AppleEHCIQueueHead *MakeEmptyIntEndPoint(
-											 UInt8 					functionAddress,
+	
+    AppleEHCIQueueHead *MakeEmptyIntEndPoint(UInt8 					functionAddress,
 											 UInt8					endpointNumber,
 											 UInt16					maxPacketSize,
 											 UInt8					speed,
-											 USBDeviceAddress				highSpeedHub,
-											 int						highSpeedPort,
+											 USBDeviceAddress		highSpeedHub,
+											 int					highSpeedPort,
 											 UInt8					direction);
 	
 	void linkInterruptEndpoint(AppleEHCIQueueHead *pEHCIEndpointDescriptor);
@@ -302,31 +304,32 @@ protected:
 										   UInt8					endpointNumber,
 										   UInt16					maxPacketSize,
 										   UInt8					speed,
-										   USBDeviceAddress				highSpeedHub,
+										   USBDeviceAddress			highSpeedHub,
 										   int						highSpeedPort,
 										   UInt8					direction,
-										   AppleEHCIQueueHead				*pED);
-    AppleEHCIQueueHead *FindInterruptEndpoint(
-											  short 					functionNumber,
-											  short					endpointNumber,
-											  short					direction,
-											  IOUSBControllerListElement			**pLEBack);
+										   AppleEHCIQueueHead		*pED);
+	
+    AppleEHCIQueueHead *FindInterruptEndpoint(short							functionNumber,
+											  short							endpointNumber,
+											  short							direction,
+											  IOUSBControllerListElement	**pLEBack);
     AppleEHCIQueueHead *AllocateQH(void);
     EHCIGeneralTransferDescriptorPtr AllocateTD(void);
     AppleEHCIIsochTransferDescriptor *AllocateITD(void);
     AppleEHCISplitIsochTransferDescriptor *AllocateSITD(void);
-    IOReturn  allocateTDs(
-						  AppleEHCIQueueHead			*pEDQueue,
-						  IOUSBCommand*			command,
+	
+    IOReturn  allocateTDs(AppleEHCIQueueHead		*pEDQueue,
+						  IOUSBCommand*				command,
 						  IOMemoryDescriptor *		CBP,
-						  UInt32				bufferSize,
-						  UInt16				direction,
-						  Boolean				controlTransaction);
-    AppleEHCIQueueHead *FindControlBulkEndpoint (
-												 short 						functionNumber, 
+						  UInt32					bufferSize,
+						  UInt16					direction,
+						  Boolean					controlTransaction);
+	
+    AppleEHCIQueueHead *FindControlBulkEndpoint (short 						functionNumber, 
 												 short						endpointNumber, 
-												 AppleEHCIQueueHead   				**pEDBack,
+												 AppleEHCIQueueHead   		**pEDBack,
 												 short direction);
+	
     void scavengeCompletedTransactions(IOUSBCompletionAction safeAction);
 	IOReturn scavengeIsocTransactions(IOUSBCompletionAction safeAction, bool reQueueTransactions);
 	IOReturn scavengeAnIsocTD(IOUSBControllerIsochListElement *pTD, IOUSBCompletionAction safeAction);
@@ -335,9 +338,11 @@ protected:
     IOReturn EHCIUIMDoDoneQueueProcessing(EHCIGeneralTransferDescriptorPtr pHCDoneTD, OSStatus forceErr, IOUSBCompletionAction safeAction, EHCIGeneralTransferDescriptorPtr stopAt);
     IOReturn DeallocateTD (EHCIGeneralTransferDescriptorPtr pTD);
     IOReturn DeallocateED (AppleEHCIQueueHead *pED);
+	
     void doCallback(EHCIGeneralTransferDescriptorPtr	nextTD,
-                    UInt32				transferStatus,
-                    UInt32  				bufferSizeRemaining);
+                    UInt32								transferStatus,
+                    UInt32								bufferSizeRemaining);
+	
 	IOReturn AsyncInitialize (void);
     IOReturn InterruptInitialize (void);
     void unlinkIntEndpoint(AppleEHCIQueueHead *pED);
@@ -366,6 +371,7 @@ protected:
 							   AppleEHCIQueueHead				*pED,
 							   AppleEHCIQueueHead				*pEDBack,
 							   IOReturn							err);
+	
     UInt32 findBufferRemaining(AppleEHCIQueueHead *pED);
 	void UIMCheckForTimeouts(void);
 #if 0
@@ -373,17 +379,17 @@ protected:
 #endif
 	
 public:
-	virtual bool 	init(OSDictionary * propTable);
-    virtual bool 	start( IOService * provider );
-    virtual void 	free();
+	virtual bool		init(OSDictionary * propTable);
+    virtual bool		start( IOService * provider );
+    virtual void		free();
     virtual IOReturn 	message( UInt32 type, IOService * provider,  void * argument = 0 );
-    IOReturn UIMInitialize(IOService * provider);
-    IOReturn UIMFinalize();
-    IOReturn UIMFinalizeForPowerDown();
-    IOReturn UIMInitializeForPowerUp();
+    IOReturn			UIMInitialize(IOService * provider);
+    IOReturn			UIMFinalize();
+    IOReturn			UIMFinalizeForPowerDown();
+    IOReturn			UIMInitializeForPowerUp();
 	
-    IOReturn DeallocateITD (AppleEHCIIsochTransferDescriptor *pTD);
-    IOReturn DeallocateSITD (AppleEHCISplitIsochTransferDescriptor *pTD);
+    IOReturn			DeallocateITD (AppleEHCIIsochTransferDescriptor *pTD);
+    IOReturn			DeallocateSITD (AppleEHCISplitIsochTransferDescriptor *pTD);
 	
 	// Control
     virtual IOReturn UIMCreateControlEndpoint(UInt8				functionNumber,
@@ -603,6 +609,8 @@ public:
     void 			CheckEDListForTimeouts(AppleEHCIQueueHead *head);
     bool			RootHubAreAllPortsDisconnectedOrSuspended( void );
     void			GetNumberOfPorts(UInt8 *numPorts);
+	
+	virtual void			SynchronizeCompanionRootHub(IOUSBControllerV2* companion);
 	
 	virtual IOUSBControllerIsochEndpoint*			AllocateIsochEP();
     virtual void									ReturnIsochDoneQueue(IOUSBControllerIsochEndpoint*);

@@ -456,7 +456,7 @@ AppleUSBEHCI::FindControlBulkEndpoint (short				functionNumber,
     
     do {
 		EDDirection = pEDQueue->_direction;
-		if( ( (USBToHostLong(pEDQueue->GetSharedLogical()->flags) & kUniqueNumNoDirMask) == unique) && ( ((EDDirection == kEHCIEDDirectionTD) || (EDDirection) == direction)) ) 
+		if( ( (USBToHostLong(pEDQueue->GetSharedLogical()->flags) & kEHCIUniqueNumNoDirMask) == unique) && ( ((EDDirection == kEHCIEDDirectionTD) || (EDDirection) == direction)) ) 
 		{
 			if (pEDBack)
 				*pEDBack = pEDQueueBack;
@@ -1021,7 +1021,7 @@ AppleUSBEHCI::EHCIUIMDoDoneQueueProcessing(EHCIGeneralTransferDescriptorPtr pHCD
 	{
 		doOnce = FALSE;
 	
-		USBLog(4, "+AppleUSBEHCI[%p]::EHCIUIMDoDoneQueueProcessing (now at level %ld)", this, currentQueue);
+		USBLog(7, "+AppleUSBEHCI[%p]::EHCIUIMDoDoneQueueProcessing (now at level %ld)", this, currentQueue);
 
 		pHCDoneTD = _doneQueueParams[currentQueue].pHCDoneTD;
 		forceErr = _doneQueueParams[currentQueue].forceErr;
@@ -1117,7 +1117,7 @@ AppleUSBEHCI::EHCIUIMDoDoneQueueProcessing(EHCIGeneralTransferDescriptorPtr pHCD
 			pHCDoneTD = nextTD;	// New qHead
 		}
 	
-		USBLog(4, "-AppleUSBEHCI[%p]::EHCIUIMDoDoneQueueProcessing", this);
+		USBLog(7, "-AppleUSBEHCI[%p]::EHCIUIMDoDoneQueueProcessing", this);
 	}
 	if (doLoop)
 		_nextDoneQueue = 0;  // we've processed all queues
@@ -2510,7 +2510,7 @@ AppleUSBEHCI::FindInterruptEndpoint(short functionNumber, short endpointNumber, 
 			pEDQueue = OSDynamicCast(AppleEHCIQueueHead, pListElem);
 			if (pEDQueue)
 			{
-				if( ( (USBToHostLong(pEDQueue->GetSharedLogical()->flags) & kUniqueNumNoDirMask) == unique) && ( pEDQueue->_direction == (UInt8)direction) ) 
+				if( ( (USBToHostLong(pEDQueue->GetSharedLogical()->flags) & kEHCIUniqueNumNoDirMask) == unique) && ( pEDQueue->_direction == (UInt8)direction) ) 
 				{
 					if (pLEBack)
 						*pLEBack = pListElementBack;
@@ -3930,15 +3930,15 @@ UInt32 AppleUSBEHCI::findBufferRemaining(AppleEHCIQueueHead *pED)
 void
 AppleUSBEHCI::CheckEDListForTimeouts(AppleEHCIQueueHead *head)
 {
-    AppleEHCIQueueHead			*pED = head;
-    AppleEHCIQueueHead			*pEDBack = NULL, *pEDBack1 = NULL;
-    IOPhysicalAddress			pTDPhys;
+    AppleEHCIQueueHead				*pED = head;
+    AppleEHCIQueueHead				*pEDBack = NULL, *pEDBack1 = NULL;
+    IOPhysicalAddress				pTDPhys;
     EHCIGeneralTransferDescriptor 	*pTD;
 	
-    UInt32 				noDataTimeout;
-    UInt32				completionTimeout;
-    UInt32				rem;
-    UInt32				curFrame = GetFrameNumber32();
+    UInt32							noDataTimeout;
+    UInt32							completionTimeout;
+    UInt32							rem;
+    UInt32							curFrame = GetFrameNumber32();
 	
     for (; pED != 0; pED = (AppleEHCIQueueHead *)pED->_logicalNext)
     {
@@ -4062,44 +4062,8 @@ AppleUSBEHCI::UIMCheckForTimeouts(void)
     AbsoluteTime	lastRootHubChangeTime;
     UInt64			elapsedTime = 0;
     bool			allPortsDisconnected = false;
-	IOReturn		err;
 	UInt32			usbcmd;
 	UInt32			usbsts;
-	
-	// Check to see if we need to recreate our root hub device
-	if (_needToCreateRootHub)
-	{
-		USBLog(1,"AppleUSBEHCI[%p]::UIMCheckForTimeouts - Need to recreate root hub on bus %ld, sleeping for 1 seconds", this, _busNumber);
-		_needToCreateRootHub = false;
-		
-		IOSleep(1000);  // Sleep for 1s
-		
-		USBLog(2,"AppleUSBEHCI[%p]::UIMCheckForTimeouts - powering up hardware", this);
-		
-		// Initialize our hardware
-		//
-		UIMInitializeForPowerUp();
-		
-		_ehciBusState = kEHCIBusStateRunning;
-		_ehciAvailable = true;										// tell the interrupt filter routine that we are on
-		_wakingFromHibernation = false;
-		
-		if ( _rootHubDevice == NULL )
-		{
-			err = CreateRootHubDevice( _device, &_rootHubDevice );
-			USBLog(1,"AppleUSBEHCI[%p]::UIMCheckForTimeouts - done creating root hub", this);
-			if ( err != kIOReturnSuccess )
-			{
-				USBError(1,"AppleUSBEHCI[%p] - Could not create root hub device upon wakeup (%x)!", this, err);
-			}
-			else
-			{
-				_rootHubDevice->registerService(kIOServiceRequired | kIOServiceSynchronous);
-				LastRootHubPortStatusChanged(true);
-			}
-		}
-		return;
-	}
 	
     // If we are not active anymore or if we're in ehciBusStateOff, then don't check for timeouts 
     //

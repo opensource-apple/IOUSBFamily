@@ -1509,7 +1509,7 @@ AppleUSBOHCI::FindControlEndpoint (
 
     while (pEDQueue != _pControlTail)
     {
-        if ((USBToHostLong(pEDQueue->pShared->flags) & kUniqueNumNoDirMask) == unique)
+        if ((USBToHostLong(pEDQueue->pShared->flags) & kOHCIUniqueNumNoDirMask) == unique)
         {
             *pEDBack = pEDQueueBack;
             return (pEDQueue);
@@ -2066,39 +2066,7 @@ AppleUSBOHCI::UIMCheckForTimeouts(void)
     AbsoluteTime	lastRootHubChangeTime;
     UInt64			elapsedTime = 0;
     bool			allPortsDisconnected = false;
-	IOReturn		err;
 
-	// Check to see if we need to recreate our root hub device
-	if (_needToCreateRootHub)
-	{
-		USBLog(5,"AppleUSBOHCI[%p] Need to recreate root hub on bus %ld, sleeping", this, _busNumber);
-		_needToCreateRootHub = false;
-		
-		IOSleep(4000);  // Sleep for 4s
-		
-		USBLog(5,"AppleUSBOHCI[%p] Need to recreate root hub on bus %ld, powering up hardware", this, _busNumber);
-
-		// Initialize the hardware
-		//
-		UIMInitializeForPowerUp();
-		
-		_ohciAvailable = true;                          // tell the interrupt filter routine that we are on
-		_ohciBusState = kOHCIBusStateRunning;
-		
-		if ( _rootHubDevice == NULL )
-		{
-			err = CreateRootHubDevice( _device, &_rootHubDevice );
-			if ( err != kIOReturnSuccess )
-			{
-				USBError(1,"AppleUSBOHCI[%p] Could not create root hub device upon wakeup (%x)!", this, err);
-			}
-			else
-			{
-				_rootHubDevice->registerService(kIOServiceRequired | kIOServiceSynchronous);
-			}
-		}
-	}
-	
     // If we are not active anymore or if we're in ohciBusStateOff, then don't check for timeouts 
     //
     if ( isInactive() || (_onCardBus && _pcCardEjected) || !_ohciAvailable || (_ohciBusState != kOHCIBusStateRunning))

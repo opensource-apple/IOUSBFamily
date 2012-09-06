@@ -234,9 +234,9 @@ AppleUSBUHCI::setPowerState( unsigned long powerStateOrdinal, IOService* whatDev
 					_rootHubDevice = NULL;
 					USBLog(2, "AppleUSBUHCI[%p]::setPowerState - Terminated root hub in setPowerState()",  this);
 				}
-				
-				USBLog(2,"AppleUSBUHCI[%p]::setPowerState - setting _needToCreateRootHub", this);
-				_needToCreateRootHub = true;
+				IOSleep(50);				// this appears to the devices as a reset, so wait the required 50 ms
+				USBLog(2,"AppleUSBUHCI[%p]::setPowerState - spawning root hub creation thread", this);
+				thread_call_enter(_rootHubCreationThread);
 				break;
 			}
 			if (_uhciBusState == kUHCIBusStateSuspended) 
@@ -246,8 +246,8 @@ AppleUSBUHCI::setPowerState( unsigned long powerStateOrdinal, IOService* whatDev
 					_idleSuspend = false;
 					if (_rootHubDevice == NULL) 
 					{
-						USBLog(2,"AppleUSBUHCI[%p]::setPowerState - setting _needToCreateRootHub", this);
-						_needToCreateRootHub = true;
+						USBLog(2,"AppleUSBUHCI[%p]::setPowerState - spawning root hub creation thread", this);
+						thread_call_enter(_rootHubCreationThread);
 					}
 					else 
 					{

@@ -440,6 +440,8 @@ IOUSBInterfaceUserClient::start( IOService * provider )
 {
     IOWorkLoop	*			workLoop = NULL;
     IOCommandGate *			commandGate = NULL;
+	OSObject *				propertyObj = NULL;
+    OSBoolean *				boolObj = NULL;
 	
     USBLog(7, "+%s[%p]::start(%p)", getName(), this, provider);
     
@@ -495,8 +497,8 @@ IOUSBInterfaceUserClient::start( IOService * provider )
 	
 	// If our IOUSBDevice has a "Need contiguous memory for isoch" property, set a flag indicating so
 	//
-	OSObject * propertyObj = fOwner->GetDevice()->copyProperty(kUSBControllerNeedsContiguousMemoryForIsoch);
-    OSBoolean * boolObj = OSDynamicCast( OSBoolean, propertyObj);
+	propertyObj = fOwner->GetDevice()->copyProperty(kUSBControllerNeedsContiguousMemoryForIsoch);
+    boolObj = OSDynamicCast( OSBoolean, propertyObj);
     if ( boolObj )
 	{
 		if ( boolObj->isTrue() )
@@ -2742,14 +2744,6 @@ IOUSBInterfaceUserClient::stop(IOService * provider)
         ReleasePreparedDescriptors();
     }
 	
-    if (fGate)
-    {
-        if (fWorkLoop)
-            fWorkLoop->removeEventSource(fGate);
-		
-        fGate->release();
-        fGate = NULL;
-    }
     super::stop(provider);
 	
     USBLog(7, "-%s[%p]::stop(%p)", getName(), this, provider);
@@ -2776,6 +2770,15 @@ IOUSBInterfaceUserClient::free()
         fFreeUSBLowLatencyCommandPool = NULL;
     }
 	
+    if (fGate)
+    {
+        if (fWorkLoop)
+            fWorkLoop->removeEventSource(fGate);
+		
+        fGate->release();
+        fGate = NULL;
+    }
+
 	if (fWorkLoop)
 	{
 		fWorkLoop->release();
@@ -2866,7 +2869,7 @@ IOUSBInterfaceUserClient::didTerminate( IOService * provider, IOOptionBits optio
     // hold on to the device and IOKit will terminate us when we close it later
 	USBLog(3, "%s[%p]::didTerminate isInactive = %d, outstandingIO = %ld", getName(), this, isInactive(), fOutstandingIO);
 	
-    if ( fOwner )
+    if ( fOwner && fOwner->isOpen() )
     {
         if ( fOutstandingIO == 0 )
 		{

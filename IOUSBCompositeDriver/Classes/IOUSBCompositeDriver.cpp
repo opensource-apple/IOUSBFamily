@@ -128,6 +128,10 @@ IOUSBCompositeDriver::message( UInt32 type, IOService * provider,  void * argume
             err = ReConfigureDevice();
             break;
             
+		case kIOUSBMessageCompositeDriverReconfigured:
+            USBLog(5, "%s[%p]::message - received kIOUSBMessageCompositeDriverReconfigured",getName(), this);
+            break;
+			
         case kIOMessageServiceIsRequestingClose:
             // Someone really wants us to close, so let's close our device:
             if ( fDevice && fDevice->isOpen(this) )
@@ -342,7 +346,9 @@ IOUSBCompositeDriver::ConfigureDevice()
 	if ( expressCardCantWakeRef && expressCardCantWakeRef->isTrue() )
 	{
 		USBLog(3, "%s[%p](%s) found an express card device which will disconnect across sleep", getName(), this, fDevice->getName() );
+		fDevice->GetBus()->retain();
 		fDevice->GetBus()->message(kIOUSBMessageExpressCardCantWake, this, fDevice);
+		fDevice->GetBus()->release();
 	}
 	
 	// If we have a property that tells us that we should suspend the port, do it now
@@ -431,6 +437,9 @@ IOUSBCompositeDriver::ReConfigureDevice()
     if (err)
     {
         USBLog(3, "%s[%p]::ReConfigureDevice.  SET_CONFIG returned 0x%x",getName(), this, err);
+		fDevice->close(this);
+		
+		goto ErrorExit;
     }
 
     // Set the remote wakeup feature if it's supported
@@ -453,7 +462,9 @@ IOUSBCompositeDriver::ReConfigureDevice()
 	if ( expressCardCantWakeRef && expressCardCantWakeRef->isTrue() )
 	{
 		USBLog(3, "%s[%p](%s) found an express card device which will disconnect across sleep", getName(), this, fDevice->getName() );
+		fDevice->GetBus()->retain();
 		fDevice->GetBus()->message(kIOUSBMessageExpressCardCantWake, this, fDevice);
+		fDevice->GetBus()->release();
 	}
 	
 	// If we have a property that tells us that we should suspend the port, do it now
@@ -468,11 +479,20 @@ IOUSBCompositeDriver::ReConfigureDevice()
 			USBLog(3, "%s[%p](%s) SuspendDevice returned 0x%x", getName(), this, fDevice->getName(), err );
 		}
 	}
-    fDevice->close(this);
 	
+	// Make sure we close our provider so that others can open it.  Do this before calling them with the kIOUSBMessageCompositeDriverReconfigured
+	// message in case they need to open the device for some reason.
+	fDevice->close(this);
+    
+	// If we are succesful, ask our provider, the IOUSBDevice, to message its clients.  Make sure to retain it during the call in case the device
+	// goes away.
+	fDevice->retain();
+	(void) fDevice->messageClients(kIOUSBMessageCompositeDriverReconfigured, NULL, 0);
+	fDevice->release();
+
 ErrorExit:
         
-    USBLog(3, "%s[%p]::ReConfigureDevice returned 0x%x",getName(),this, err);
+    USBLog(6, "%s[%p]::ReConfigureDevice returned 0x%x",getName(),this, err);
     return err;
 }
 
