@@ -96,7 +96,7 @@ void AppleUSBOHCI::PollInterrupts(IOUSBCompletionAction safeAction)
 				// We could make sure all OCHI registers and in-memory
 				// data structures are valid, too.
 				_pOHCIRegisters->hcCommandStatus = HostToUSBLong(kOHCIHcCommandStatus_HCR);
-				IODelay(10);				// 10 microsecond delay
+				delay(10 * MICROSECOND);
 				_pOHCIRegisters->hcControl = HostToUSBLong((kOHCIFunctionalState_Operational << kOHCIHcControl_HCFSPhase) | kOHCIHcControl_PLE);
 			}
 			else

@@ -62,54 +62,78 @@ OSDefineMetaClassAndStructors(AppleUSBOHCI, IOUSBControllerV2)
 bool 
 AppleUSBOHCI::init(OSDictionary * propTable)
 {
-    if (!super::init(propTable))  
-		return false;
+    if (!super::init(propTable))  return false;
 	
+    _ohciBusState = kOHCIBusStateOff;
+    _ohciAvailable = true;
+    
     _intLock = IOLockAlloc();
     if (!_intLock)
-		goto ErrorExit;
+        return(false);
 	
     _wdhLock = IOSimpleLockAlloc();
     if (!_wdhLock)
-		goto ErrorExit;
-	
-	// Allocate a thread call to create the root hub
-	_rootHubCreationThread = thread_call_allocate((thread_call_func_t)RootHubCreationEntry, (thread_call_param_t)this);
-	
-	if ( !_rootHubCreationThread)
-		goto ErrorExit;
+        return(false);
 	
     _uimInitialized = false;
-    _ohciBusState = kOHCIBusStateOff;
-    _ohciAvailable = true;
-    _controllerSpeed = kUSBDeviceSpeedFull;	
     
     // Initialize our consumer and producer counts.  
     //
     _producerCount = 1;
     _consumerCount = 1;
 	
+    _controllerSpeed = kUSBDeviceSpeedFull;	
+	
     return (true);
-	
-ErrorExit:
-		
-	if (_intLock)
-		IOLockFree(_intLock);
-	
-	if ( _wdhLock )
-		IOSimpleLockFree(_wdhLock);
-
-	return false;
 }
 
 
 bool
 AppleUSBOHCI::start( IOService * provider )
 {
+	OSIterator				*siblings = NULL;
+    mach_timespec_t			t;
+    OSDictionary			*matching;
+    IOService				*service;
+    IORegistryEntry			*entry;
+    bool					ehciPresent = false;
     
-	// before we actually start the controller, we need to check for an EHCI controller
-    CheckForEHCIController(provider);
-	    
+    // Check my provide (_device) parent (a PCI bridge) children (sibling PCI functions)
+    // to see if any of them is an EHCI controller - if so, wait for it..
+    
+	if (provider)
+		siblings = provider->getParentEntry(gIOServicePlane)->getChildIterator(gIOServicePlane);
+	
+	if( siblings ) 
+	{
+		while( (entry = OSDynamicCast(IORegistryEntry, siblings->getNextObject())))
+		{
+			UInt32			classCode;
+			OSData			*obj = OSDynamicCast(OSData, entry->getProperty("class-code"));
+			if (obj) 
+			{
+				classCode = *(UInt32 *)obj->getBytesNoCopy();
+				if (classCode == 0x0c0320) 
+				{
+					ehciPresent = true;
+					break;
+				}
+			}
+		}
+		siblings->release();
+	}
+	
+    if (ehciPresent) 
+	{
+        t.tv_sec = 5;
+        t.tv_nsec = 0;
+        USBLog(3, "AppleUSBOHCI[%p]::start waiting for EHCI", this);
+		setProperty("Companion", "yes");
+        service = waitForService( serviceMatching("AppleUSBEHCI"), &t );
+        USBLog(3, "AppleUSBOHCI[%p]::start got EHCI service %p", this, service);
+    }
+    
+    
     USBLog(5,"+AppleUSBOHCI[%p]::start", this);
     if( !super::start(provider))
         return false;
@@ -195,6 +219,14 @@ AppleUSBOHCI::UIMInitialize(IOService * provider)
 			break;
         }
 		
+        _genCursor = IONaturalMemoryCursor::withSpecification(PAGE_SIZE, PAGE_SIZE);
+        if(!_genCursor)
+            break;
+		
+        _isoCursor = IONaturalMemoryCursor::withSpecification(kUSBMaxFSIsocEndpointReqCount,  kUSBMaxFSIsocEndpointReqCount);
+        if(!_isoCursor)
+            break;
+		
         /*
          * Initialize my data and the hardware
          */
@@ -220,6 +252,7 @@ AppleUSBOHCI::UIMInitialize(IOService * provider)
         
         USBLog(5,"AppleUSBOHCI[%p]::UIMInitialize errata bits=%lx", this, _errataBits);
 		
+        _pageSize = PAGE_SIZE;
         _pOHCIRegisters = (OHCIRegistersPtr) _deviceBase->getVirtualAddress();
 		
 #if (DEBUGGING_LEVEL > 2)
@@ -227,8 +260,8 @@ AppleUSBOHCI::UIMInitialize(IOService * provider)
 #endif
         
         // enable the card
-        lvalue = _device->configRead32(kIOPCIConfigCommand);
-        _device->configWrite32(kIOPCIConfigCommand, (lvalue & 0xffff0000) | (kIOPCICommandBusMaster | kIOPCICommandMemorySpace));
+        lvalue = _device->configRead32(cwCommand);
+        _device->configWrite32(cwCommand, (lvalue & 0xffff0000) | (cwCommandEnableBusMaster | cwCommandEnableMemorySpace));
 		
         // Check to see if the hcDoneHead is not NULL.  If so, then we need to reset the controller
         //
@@ -387,13 +420,9 @@ AppleUSBOHCI::UIMFinalize(void)
 			(long)_deviceBase->getVirtualAddress(),
 			_deviceBase->getPhysicalAddress());
 	
-#if 0
-	// 4930013: JRH - This is a bad thing to do with shared interrupts, and since we turn off interrupts at the source
-	// it should be redundant. Let's stop doing it..
     // Disable the interrupt delivery
     //
     _workLoop->disableAllInterrupts();
-#endif
 	
     // If we are NOT being terminated, then talk to the OHCI controller and
     // set up all the registers to be off
@@ -412,7 +441,7 @@ AppleUSBOHCI::UIMFinalize(void)
         IOSleep(2);
 		
         // Take away the controllers ability be a bus master.
-        _device->configWrite32(kIOPCIConfigCommand, kIOPCICommandMemorySpace);
+        _device->configWrite32(cwCommand, cwCommandEnableMemorySpace);
 		
         // Clear all Processing Registers
         _pOHCIRegisters->hcHCCA = 0;
@@ -495,6 +524,17 @@ AppleUSBOHCI::UIMFinalize(void)
     
     // Release the memory cursors
     //
+    if ( _genCursor )
+    {
+        _genCursor->release();
+        _genCursor = NULL;
+    }
+    
+    if ( _isoCursor )
+    {
+        _isoCursor->release();
+        _isoCursor = NULL;
+    }
 	
     _uimInitialized = false;
     
@@ -576,24 +616,29 @@ AppleUSBOHCI::doCallback(AppleOHCIGeneralTransferDescriptorPtr	nextTD,
 UInt32 
 AppleUSBOHCI::findBufferRemaining (AppleOHCIGeneralTransferDescriptorPtr pCurrentTD)
 {
-    UInt32                      pageNumMask;
+    UInt32                      pageMask;
     UInt32                      bufferSizeRemaining;
 	
 	
-    pageNumMask = ~PAGE_MASK;
+    pageMask = ~(_pageSize - 1);
 	
     if (pCurrentTD->pShared->currentBufferPtr == 0)
     {
         bufferSizeRemaining = 0;
     }
-    else if ((USBToHostLong(pCurrentTD->pShared->bufferEnd) & (pageNumMask)) == (USBToHostLong(pCurrentTD->pShared->currentBufferPtr) & (pageNumMask)))
+    else if ((USBToHostLong(pCurrentTD->pShared->bufferEnd) & (pageMask)) ==
+             (USBToHostLong(pCurrentTD->pShared->currentBufferPtr)& (pageMask)))
     {
         // we're on the same page
-        bufferSizeRemaining = (USBToHostLong (pCurrentTD->pShared->bufferEnd) & PAGE_MASK) - (USBToHostLong (pCurrentTD->pShared->currentBufferPtr) & PAGE_MASK) + 1;
+        bufferSizeRemaining =
+        (USBToHostLong (pCurrentTD->pShared->bufferEnd) & ~pageMask) -
+        (USBToHostLong (pCurrentTD->pShared->currentBufferPtr) & ~pageMask) + 1;
     }
     else
     {
-        bufferSizeRemaining = ((USBToHostLong(pCurrentTD->pShared->bufferEnd) & PAGE_MASK) + 1)  + (PAGE_SIZE - (USBToHostLong(pCurrentTD->pShared->currentBufferPtr) & PAGE_MASK));
+        bufferSizeRemaining =
+        ((USBToHostLong(pCurrentTD->pShared->bufferEnd) & ~pageMask) + 1)  +
+        (_pageSize - (USBToHostLong(pCurrentTD->pShared->currentBufferPtr) & ~pageMask));
     }
 	
     return (bufferSizeRemaining);
@@ -1548,35 +1593,35 @@ AppleUSBOHCI::dumpRegs(void)
 {
     UInt32		lvalue;
     
-    lvalue = _device->configRead32(kIOPCIConfigVendorID);
-    USBLog(5,"OHCI: kIOPCIConfigVendorID=%lx", lvalue);
+    lvalue = _device->configRead32(cwVendorID);
+    USBLog(5,"OHCI: cwVendorID=%lx", lvalue);
 	
-    lvalue = _device->configRead32(kIOPCIConfigRevisionID);
-    USBLog(5,"OHCI: kIOPCIConfigRevisionID=%lx", lvalue);
-    lvalue = _device->configRead32(kIOPCIConfigCacheLineSize);
-    USBLog(5,"OHCI: kIOPCIConfigCacheLineSize=%lx", lvalue);
-    lvalue = _device->configRead32(kIOPCIConfigBaseAddress0);
-    USBLog(5,"OHCI: kIOPCIConfigBaseAddress0=%lx", lvalue);
-    lvalue = _device->configRead32(kIOPCIConfigBaseAddress1);
-    USBLog(5,"OHCI: kIOPCIConfigBaseAddress1=%lx", lvalue);
-    lvalue = _device->configRead32(kIOPCIConfigExpansionROMBase);
-    USBLog(5,"OHCI: kIOPCIConfigExpansionROMBase=%lx", lvalue);
-    lvalue = _device->configRead32(kIOPCIConfigInterruptLine);
-    USBLog(5,"OHCI: kIOPCIConfigInterruptLine=%lx", lvalue);
-    lvalue = _device->configRead32(kIOPCIConfigInterruptLine+4);
-    USBLog(5,"OHCI: kIOPCIConfigInterruptLine+4=%lx", lvalue);
-    lvalue = _device->configRead32(kIOPCIConfigCommand);
-    USBLog(5,"OHCI: kIOPCIConfigCommand=%lx", lvalue & 0x0000ffff);
-    USBLog(5,"OHCI: kIOPCIConfigStatus=%lx", lvalue & 0xffff0000);
+    lvalue = _device->configRead32(clClassCodeAndRevID);
+    USBLog(5,"OHCI: clClassCodeAndRevID=%lx", lvalue);
+    lvalue = _device->configRead32(clHeaderAndLatency);
+    USBLog(5,"OHCI: clHeaderAndLatency=%lx", lvalue);
+    lvalue = _device->configRead32(clBaseAddressZero);
+    USBLog(5,"OHCI: clBaseAddressZero=%lx", lvalue);
+    lvalue = _device->configRead32(clBaseAddressOne);
+    USBLog(5,"OHCI: clBaseAddressOne=%lx", lvalue);
+    lvalue = _device->configRead32(clExpansionRomAddr);
+    USBLog(5,"OHCI: clExpansionRomAddr=%lx", lvalue);
+    lvalue = _device->configRead32(clLatGntIntPinLine);
+    USBLog(5,"OHCI: clLatGntIntPinLine=%lx", lvalue);
+    lvalue = _device->configRead32(clLatGntIntPinLine+4);
+    USBLog(5,"OHCI: clLatGntIntPinLine+4=%lx", lvalue);
+    lvalue = _device->configRead32(cwCommand);
+    USBLog(5,"OHCI: cwCommand=%lx", lvalue & 0x0000ffff);
+    USBLog(5,"OHCI: cwStatus=%lx", lvalue & 0xffff0000);
 	
-    lvalue = _device->configRead32(kIOPCIConfigCommand);
-    _device->configWrite32(kIOPCIConfigCommand, lvalue);
-    _device->configWrite32(kIOPCIConfigCommand, (lvalue & 0xffff0000) |
-						   (kIOPCICommandBusMaster |
-							kIOPCICommandMemorySpace));
-    lvalue = _device->configRead32(kIOPCIConfigCommand);
-    USBLog(5,"OHCI: kIOPCIConfigCommand=%lx", lvalue & 0x0000ffff);
-    USBLog(5,"OHCI: kIOPCIConfigStatus=%lx", lvalue & 0xffff0000);
+    lvalue = _device->configRead32(cwCommand);
+    _device->configWrite32(cwCommand, lvalue);
+    _device->configWrite32(cwCommand, (lvalue & 0xffff0000) |
+						   (cwCommandEnableBusMaster |
+							cwCommandEnableMemorySpace));
+    lvalue = _device->configRead32(cwCommand);
+    USBLog(5,"OHCI: cwCommand=%lx", lvalue & 0x0000ffff);
+    USBLog(5,"OHCI: cwStatus=%lx", lvalue & 0xffff0000);
 	
     USBLog(5,"OHCI: HcRevision=%lx", (UInt32) USBToHostLong((_pOHCIRegisters)->hcRevision));
     USBLog(5,"      HcControl=%lx",  (UInt32) USBToHostLong((_pOHCIRegisters)->hcControl));
@@ -1799,14 +1844,6 @@ AppleUSBOHCI::stop(IOService * provider)
 {
     USBLog(5, "AppleUSBOHCI[%p]::stop isInactive = %d", this, isInactive());
     
-	if (_ehciController)
-	{
-		// we retain this so that we have a valid copy in case of sleep/wake
-		// once we stop we will no longer sleep/wake, so we can release it
-		_ehciController->release();
-		_ehciController = NULL;
-	}
-
 	super::stop(provider);
 }
 
@@ -1850,8 +1887,8 @@ AppleUSBOHCI::UIMInitializeForPowerUp(void)
 	
     // Enable the controller
     //
-    commandRegister = _device->configRead32(kIOPCIConfigCommand);
-    _device->configWrite32(kIOPCIConfigCommand, (commandRegister & 0xffff0000) | (kIOPCICommandBusMaster | kIOPCICommandMemorySpace));
+    commandRegister = _device->configRead32(cwCommand);
+    _device->configWrite32(cwCommand, (commandRegister & 0xffff0000) | (cwCommandEnableBusMaster | cwCommandEnableMemorySpace));
 	
     // Check to see if the hcDoneHead is not NULL.  If so, then we need to reset the controller
     //
@@ -1992,13 +2029,9 @@ AppleUSBOHCI::UIMFinalizeForPowerDown(void)
     dumpRegs();
 #endif
     
-#if 0
-	// 4930013: JRH - This is a bad thing to do with shared interrupts, and since we turn off interrupts at the source
-	// it should be redundant. Let's stop doing it..
     // Disable the interrupt delivery
     //
     _workLoop->disableAllInterrupts();
-#endif
     
     // Disable All OHCI Interrupts
     _pOHCIRegisters->hcInterruptDisable = HostToUSBLong(kOHCIHcInterrupt_MIE);
@@ -2012,7 +2045,7 @@ AppleUSBOHCI::UIMFinalizeForPowerDown(void)
     IOSleep(2);
 	
     // Take away the controllers ability be a bus master.
-    _device->configWrite32(kIOPCIConfigCommand, kIOPCICommandMemorySpace);
+    _device->configWrite32(cwCommand, cwCommandEnableMemorySpace);
 	
     // Clear all Processing Registers
     _pOHCIRegisters->hcHCCA = 0;
@@ -2047,146 +2080,3 @@ AppleUSBOHCI::free()
     super::free();
 }
 
-
-
-IODMACommand*
-AppleUSBOHCI::GetNewDMACommand()
-{
-	return IODMACommand::withSpecification(kIODMACommandOutputHost64, 32, PAGE_SIZE);
-}
-
-
-
-IOReturn
-AppleUSBOHCI::CheckForEHCIController(IOService *provider)
-{
-	OSIterator				*siblings = NULL;
-	OSIterator				*ehciList = NULL;
-    mach_timespec_t			t;
-    OSDictionary			*matching;
-    IOService				*service;
-    IORegistryEntry			*entry;
-    bool					ehciPresent = false;
-	const char *			myProviderLocation;
-	const char *			ehciProviderLocation;
-	int						myDeviceNum = 0, myFnNum = 0;
-	int						ehciDeviceNum = 0, ehciFnNum = 0;
-	AppleUSBEHCI *			testEHCI;
-	int						checkListCount = 0;
-    
-    // Check my provide (_device) parent (a PCI bridge) children (sibling PCI functions)
-    // to see if any of them is an EHCI controller - if so, wait for it..
-    
-	if (provider)
-	{
-		siblings = provider->getParentEntry(gIOServicePlane)->getChildIterator(gIOServicePlane);
-		myProviderLocation = provider->getLocation();
-		if (myProviderLocation)
-		{
-			super::ParsePCILocation(myProviderLocation, &myDeviceNum, &myFnNum);
-		}
-	}
-	else
-	{
-		USBLog(2, "AppleUSBOHCI[%p]::CheckForEHCIController - NULL provider", this);
-	}
-	
-	if( siblings ) 
-	{
-		while( (entry = OSDynamicCast(IORegistryEntry, siblings->getNextObject())))
-		{
-			UInt32			classCode;
-			OSData			*obj = OSDynamicCast(OSData, entry->getProperty("class-code"));
-			if (obj) 
-			{
-				classCode = *(UInt32 *)obj->getBytesNoCopy();
-				if (classCode == 0x0c0320) 
-				{
-					ehciPresent = true;
-					break;
-				}
-			}
-		}
-		siblings->release();
-	}
-	else
-	{
-		USBLog(2, "AppleUSBOHCI[%p]::CheckForEHCIController - NULL siblings", this);
-	}
-	
-
-    if (ehciPresent) 
-	{
-        t.tv_sec = 5;
-        t.tv_nsec = 0;
-        USBLog(7, "AppleUSBOHCI[%p]::CheckForEHCIController calling waitForService for AppleUSBEHCI", this);
-        service = waitForService( serviceMatching("AppleUSBEHCI"), &t );
-		testEHCI = (AppleUSBEHCI*)service;
-		while (testEHCI)
-		{
-			ehciProviderLocation = testEHCI->getParentEntry(gIOServicePlane)->getLocation();
-			if (ehciProviderLocation)
-			{
-				super::ParsePCILocation(ehciProviderLocation, &ehciDeviceNum, &ehciFnNum);
-			}
-			if (myDeviceNum == ehciDeviceNum)
-			{
-				USBLog(2, "AppleUSBOHCI[%p]::CheckForEHCIController - ehciDeviceNum and myDeviceNum match (%d)", this, myDeviceNum);
-				_ehciController = testEHCI;
-				_ehciController->retain();
-				USBLog(7, "AppleUSBOHCI[%p]::CheckForEHCIController got EHCI service %p", this, service);
-				setProperty("Companion", "yes");
-				break;
-			}
-			else
-			{
-				// we found an instance of EHCI, but it doesn't appear to be ours, so now I need to see how many there are in the system
-				// and see if any of them matches
-				USBLog(2, "AppleUSBOHCI[%p]::CheckForEHCIController - ehciDeviceNum(%d) and myDeviceNum(%d) do NOT match", this, ehciDeviceNum, myDeviceNum);
-				if (ehciList)
-				{
-					testEHCI = (AppleUSBEHCI*)(ehciList->getNextObject());
-					if (testEHCI)
-					{
-						USBLog(2, "AppleUSBOHCI[%p]::CheckForEHCIController - got AppleUSBEHCI[%p] from the list", this, testEHCI);
-					}
-				}
-				else
-				{
-					testEHCI = NULL;
-				}
-				
-				if (!testEHCI && (checkListCount++ < 2))
-				{
-					if (ehciList)
-						ehciList->release();
-						
-					if (checkListCount == 2)
-					{
-						USBLog(2, "AppleUSBOHCI[%p]::CheckForEHCIController - waiting for 5 seconds", this);
-						IOSleep(5000);				// wait 5 seconds the second time around
-					}
-
-					USBLog(2, "AppleUSBOHCI[%p]::CheckForEHCIController - getting an AppleUSBEHCI list", this);
-					ehciList = getMatchingServices(serviceMatching("AppleUSBEHCI"));
-					if (ehciList)
-					{
-						testEHCI = (AppleUSBEHCI*)(ehciList->getNextObject());
-						if (testEHCI)
-						{
-							USBLog(2, "AppleUSBOHCI[%p]::CheckForEHCIController - got AppleUSBEHCI[%p] from the list", this, testEHCI);
-						}
-					}
-				}
-			}
-		}
-    }
-	else
-	{
-		USBLog(2, "AppleUSBOHCI[%p]::CheckForEHCIController - EHCI controller not found in siblings", this);
-	}
-	if (ehciList)
-		ehciList->release();
-		
-	return kIOReturnSuccess;
-}

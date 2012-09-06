@@ -32,6 +32,6 @@
 
 - (IBAction)copy:(id)sender;
 - (NSString *)stringRepresentation;
-- (BOOL)validateMenuItem:(NSMenuItem *)menuItem;
+- (BOOL)validateMenuItem:(id <NSMenuItem>)menuItem;
 
 @end

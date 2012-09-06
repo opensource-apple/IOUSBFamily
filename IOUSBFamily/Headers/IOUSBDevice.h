@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 1998-2007 Apple Inc. All rights reserved.
+ * Copyright (c) 1998-2006 Apple Computer, Inc. All rights reserved.
  *
  * @APPLE_LICENSE_HEADER_START@
  * 
@@ -102,10 +102,6 @@ protected:
 		bool					_suspendCommand;
 		IOCommandGate *			_commandGate;
 		OSSet *					_openInterfaces;
-		bool					_resetCommand;
-		IOReturn				_resetError;
-		IOReturn				_suspendError;
-        thread_call_t			_doMessageClientsThread;
     };
     ExpansionData * _expansionData;
 
@@ -142,13 +138,11 @@ public:
     virtual bool 	willTerminate( IOService * provider, IOOptionBits options );
     virtual bool 	didTerminate( IOService * provider, IOOptionBits options, bool * defer );
 	
-#if !(defined(__ppc__) && defined(KPI_10_4_0_PPC_COMPAT))
 	virtual bool	handleIsOpen(const IOService *forClient) const;
 	virtual bool	handleOpen(IOService *forClient, IOOptionBits options, void *arg);
 	virtual void	handleClose(IOService *forClient, IOOptionBits options);
     virtual bool	terminate( IOOptionBits options = 0 );
     virtual bool	requestTerminate( IOService * provider, IOOptionBits options );
-#endif
 
     virtual void SetPort(void *port);			// Obsolete, do NOT use
 
@@ -343,10 +337,9 @@ public:
 
     virtual void 	DisplayNotEnoughPowerNotice();
     
-    // these are non-virtual functions so that we don't have to take up a binary compatibility slot.
+    // this is a non-virtual function so that we don't have to take up a binary compatibility slot.
     UInt16	GetbcdUSB(void);
     UInt8	GetProtocol(void);
-	void	SetBusPowerAvailable(UInt32 newPower);
 
     OSMetaClassDeclareReservedUsed(IOUSBDevice,  0);
     /*!
@@ -400,7 +393,6 @@ public:
      */
     virtual void	DisplayUserNotification(UInt32 notificationType);
     
-#if !(defined(__ppc__) && defined(KPI_10_4_0_PPC_COMPAT))
     OSMetaClassDeclareReservedUsed(IOUSBDevice,  5);
 	/*!
         @function MakePipe
@@ -410,9 +402,6 @@ public:
 	 */
     virtual IOUSBPipe*	MakePipe(const IOUSBEndpointDescriptor *ep, IOUSBInterface *interface);
     
-#else
-    OSMetaClassDeclareReservedUnused(IOUSBDevice,  5);
-#endif
 	
     OSMetaClassDeclareReservedUnused(IOUSBDevice,  6);
     OSMetaClassDeclareReservedUnused(IOUSBDevice,  7);
@@ -441,10 +430,7 @@ private:
    
     static void 	ProcessPortReEnumerateEntry(OSObject *target, thread_call_param_t options);
     void 		ProcessPortReEnumerate(UInt32 options);
-	
-    static void 	DoMessageClientsEntry(OSObject *target, thread_call_param_t messageStruct);
-    void 		DoMessageClients( void * messageStructPtr);
-	
+
     static void 	DisplayUserNotificationForDeviceEntry (OSObject *owner, IOTimerEventSource *sender);
     void		DisplayUserNotificationForDevice( );
     

@@ -38,7 +38,7 @@ enum
 };
 
 
-class AppleUSBOHCIedMemoryBlock : public OSObject
+class AppleUSBOHCIedMemoryBlock : public IOBufferMemoryDescriptor
 {
     OSDeclareDefaultStructors(AppleUSBOHCIedMemoryBlock);
     
@@ -49,7 +49,6 @@ private:
     OHCIEndpointDescriptorSharedPtr		_sharedLogical;
     AppleUSBOHCIedMemoryBlock			*_nextBlock;
     AppleOHCIEndpointDescriptor			_eds[EDsPerBlock];	// the non shared data
-	IOBufferMemoryDescriptor			*_buffer;
     
 public:
 
@@ -65,7 +64,7 @@ public:
 
 
 
-class AppleUSBOHCIgtdMemoryBlock : public OSObject
+class AppleUSBOHCIgtdMemoryBlock : public IOBufferMemoryDescriptor
 {
     OSDeclareDefaultStructors(AppleUSBOHCIgtdMemoryBlock);
     
@@ -76,7 +75,6 @@ private:
     OHCIGeneralTransferDescriptorSharedPtr		_sharedLogical;
     AppleUSBOHCIgtdMemoryBlock					*_nextBlock;
     AppleOHCIGeneralTransferDescriptor			_gtds[GTDsPerBlock];	// the non shared data
-	IOBufferMemoryDescriptor					*_buffer;
     
 public:
 
@@ -93,7 +91,7 @@ public:
 
 
 
-class AppleUSBOHCIitdMemoryBlock : public OSObject
+class AppleUSBOHCIitdMemoryBlock : public IOBufferMemoryDescriptor
 {
     OSDeclareDefaultStructors(AppleUSBOHCIitdMemoryBlock);
     
@@ -104,7 +102,6 @@ private:
     OHCIIsochTransferDescriptorSharedPtr			_sharedLogical;
     AppleUSBOHCIitdMemoryBlock						*_nextBlock;
     AppleOHCIIsochTransferDescriptor				_itds[ITDsPerBlock];	// the non shared data
-	IOBufferMemoryDescriptor						*_buffer;
     
 public:
 
@@ -119,3 +116,4 @@ public:
     AppleOHCIIsochTransferDescriptorPtr				GetITD(UInt32 index);
 };
 
+#endif

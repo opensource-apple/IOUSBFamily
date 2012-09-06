@@ -29,7 +29,7 @@
 #include "AppleUSBEHCI.h"
 #include "USBEHCI.h"
 
-class AppleEHCItdMemoryBlock : public OSObject
+class AppleEHCItdMemoryBlock : public IOBufferMemoryDescriptor
 {
     OSDeclareDefaultStructors(AppleEHCItdMemoryBlock);
     
@@ -38,7 +38,6 @@ class AppleEHCItdMemoryBlock : public OSObject
 private:
     EHCIGeneralTransferDescriptor		_TDs[TDsPerBlock];
     AppleEHCItdMemoryBlock				*_nextBlock;
-	IOBufferMemoryDescriptor			*_buffer;
     
 public:
 

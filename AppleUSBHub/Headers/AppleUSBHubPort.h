@@ -2,7 +2,7 @@
  *
  * @APPLE_LICENSE_HEADER_START@
  * 
- * Copyright (c) 1998-2007 Apple Inc.  All Rights Reserved.
+ * Copyright (c) 1998-2003 Apple Computer, Inc.  All Rights Reserved.
  * 
  * This file contains Original Code and/or Modifications of Original Code
  * as defined in and that are subject to the Apple Public Source License
@@ -89,9 +89,11 @@ protected:
     UInt32							_attachRetry;
 	bool							_attachMessageDisplayed;
 	bool							_overCurrentNoticeDisplayed;
-	UInt32							_extraPower;							// amount of extra power being used in order to beef up the port from 100ma to 500ma
     
     portStatusChangeVector	_changeHandler[kNumChangeHandlers];
+    
+    struct ExpansionData { /* */ };
+    ExpansionData * _expansionData;
 
 private:
 		

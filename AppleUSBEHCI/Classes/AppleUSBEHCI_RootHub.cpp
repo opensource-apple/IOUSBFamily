@@ -23,11 +23,9 @@
  */
 
 
-#include <libkern/OSByteOrder.h>
-
 #include <IOKit/usb/USB.h>
 #include <IOKit/usb/IOUSBLog.h>
-#include <IOKit/usb/IOUSBRootHubDevice.h>
+#include <libkern/OSByteOrder.h>
 
 #include "AppleUSBEHCI.h"
 
@@ -1034,14 +1032,14 @@ OSMetaClassDefineReservedUsed(IOUSBController,  10);
 void 
 AppleUSBEHCI::UIMRootHubStatusChange(bool abort)
 {
-    UInt8								numPorts = 0;
-    UInt32								HCSParams;
-    UInt16								statusChangedBitmap;   /* only have 15 ports in EHCI */
-    IOUSBHubPortStatus					portStatus;
-    UInt32								hubStatus, statusBit, tempStatus;
-    unsigned int						index, port, move;
-    struct EHCIRHInterruptTransaction			last;
-	bool								overCurrentReported = false;
+    UInt8						numPorts = 0;
+    UInt32						HCSParams;
+    UInt16						statusChangedBitmap;   /* only have 15 ports in EHCI */
+    IOUSBHubPortStatus			portStatus;
+    UInt32						hubStatus, statusBit, tempStatus;
+    unsigned int				index, port, move;
+    struct InterruptTransaction last;
+	bool						overCurrentReported = false;
     
 	if (_ehciAvailable)
 	{
@@ -1211,7 +1209,7 @@ AppleUSBEHCI::SimulateRootHubInt(UInt8						endpoint,
 			
 			if ( elapsedTime < kEHCIRootHubPollingInterval )
 			{
-				USBLog(5, "AppleUSBEHCI[%p]::SimulateRootHubInt  Last change was %qd ms ago.  IOSleep'ing for %qd ms, inGate: %d",  this, elapsedTime, kEHCIRootHubPollingInterval - elapsedTime, _workLoop->inGate() );
+				USBLog(5, "AppleUSBEHCI[%p]::SimulateRootHubInt  Last change was %qd ms ago.  IOSleep'ing for %qd ms",  this, elapsedTime, kEHCIRootHubPollingInterval - elapsedTime );
 				IOSleep( kEHCIRootHubPollingInterval - elapsedTime );
 			}
 				
@@ -1409,15 +1407,15 @@ AppleUSBEHCI::RootHubAreAllPortsDisconnectedOrSuspended( )
 		if ((portStat & kEHCIPortSC_Connect) && !(portStat & kEHCIPortSC_Suspend))
 		{
 			USBLog(6, "AppleUSBEHCI[%p]::RootHubAreAllPortsDisconnectedOrSuspended - port %d CONNECTED, NOT ENABLED and not suspended - we used to allow this but no more",  this, i+1);
-			USBLog(7, "AppleUSBEHCI::RHAPDOS: USBCMD(%p) USBSTS(%p) USBIntr(%p) PortSC(%p %p %p %p %p)",
-					 (void*)USBToHostLong(_pEHCIRegisters->USBCMD),
-					 (void*)USBToHostLong(_pEHCIRegisters->USBSTS),
-					 (void*)USBToHostLong(_pEHCIRegisters->USBIntr),
-					 (void*)USBToHostLong(_pEHCIRegisters->PortSC[0]),
-					 (void*)USBToHostLong(_pEHCIRegisters->PortSC[1]),
-					 (void*)USBToHostLong(_pEHCIRegisters->PortSC[2]),
-					 (void*)USBToHostLong(_pEHCIRegisters->PortSC[3]),
-					 (void*)USBToHostLong(_pEHCIRegisters->PortSC[4]));
+			USBLog(6, "AppleUSBEHCI::RHAPDOS: USBCMD(0x%x) USBSTS(0x%x) USBIntr(0x%x) PortSC(0x%x 0x%x 0x%x 0x%x 0x%x)",
+					 USBToHostLong(_pEHCIRegisters->USBCMD),
+					 USBToHostLong(_pEHCIRegisters->USBSTS),
+					 USBToHostLong(_pEHCIRegisters->USBIntr),
+					 USBToHostLong(_pEHCIRegisters->PortSC[0]),
+					 USBToHostLong(_pEHCIRegisters->PortSC[1]),
+					 USBToHostLong(_pEHCIRegisters->PortSC[2]),
+					 USBToHostLong(_pEHCIRegisters->PortSC[3]),
+					 USBToHostLong(_pEHCIRegisters->PortSC[4]));
 							
 			return false;
 		}
@@ -1437,8 +1435,7 @@ AppleUSBEHCI::RootHubAreAllPortsDisconnectedOrSuspended( )
     return result;
 }
 
-
-
+// this is a static method - hence no slot
 void
 AppleUSBEHCI::PortDetectInterruptThreadEntry(OSObject *target)
 {
@@ -1451,8 +1448,6 @@ AppleUSBEHCI::PortDetectInterruptThreadEntry(OSObject *target)
     me->PortDetectInterruptThread();
     me->release();
 }
-
-
 
 void
 AppleUSBEHCI::PortDetectInterruptThread()
@@ -1490,58 +1485,5 @@ AppleUSBEHCI::PortDetectInterruptThread()
 	
 	UIMRootHubStatusChange();
 }
-
-
-
-void
-AppleUSBEHCI::RootHubCreationEntry(OSObject *target)
-{
-    AppleUSBEHCI *			me = OSDynamicCast(AppleUSBEHCI, target);
-	
-    if (!me )
-        return;
-	
-    me->retain();
-    me->RootHubCreation();
-    me->release();
-}
-
-
-
-void
-AppleUSBEHCI::RootHubCreation()
-{
-	IOReturn		err;
-	
-	USBLog(1,"AppleUSBEHCI[%p]::RootHubCreation - Need to recreate root hub on bus %ld", this, _busNumber);
-		
-	USBLog(2,"AppleUSBEHCI[%p]::RootHubCreation - powering up hardware", this);
-	
-	// Initialize our hardware
-	//
-	UIMInitializeForPowerUp();
-	
-	_ehciBusState = kEHCIBusStateRunning;
-	_ehciAvailable = true;										// tell the interrupt filter routine that we are on
-	_wakingFromHibernation = false;
-	
-	if ( _rootHubDevice == NULL )
-	{
-		err = CreateRootHubDevice( _device, &_rootHubDevice );
-		USBLog(1,"AppleUSBEHCI[%p]::RootHubCreation - done creating root hub", this);
-		if ( err != kIOReturnSuccess )
-		{
-			USBError(1,"AppleUSBEHCI[%p]::RootHubCreation - Could not create root hub device upon wakeup (%x)!", this, err);
-		}
-		else
-		{
-			_rootHubDevice->registerService(kIOServiceRequired | kIOServiceSynchronous);
-			LastRootHubPortStatusChanged(true);
-		}
-	}
-	_companionWakeHoldoff = false;
-	return;
-}
-
 
 

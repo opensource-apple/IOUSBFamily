@@ -49,7 +49,6 @@ extern "C" {
 #include <IOKit/usb/IOUSBControllerV2.h>
 
 #include "UHCI.h"
-#include "AppleUSBEHCI.h"
 
 // forward declarations
 class AppleUHCItdMemoryBlock;
@@ -58,8 +57,6 @@ class AppleUHCIQueueHead;
 class AppleUHCITransferDescriptor;
 class AppleUHCIIsochTransferDescriptor;
 class AppleUHCIIsochEndpoint;
-class AppleUSBUHCI;
-class AppleUSBUHCIDMACommand;
 
 // Convert USBLog to use kprintf debugging
 #define UHCI_USE_KPRINTF 0
@@ -149,61 +146,29 @@ enum {
  * The size of the buffer is the maxPacketSize
  * of the associated endpoint.
  */
-class UHCIAlignmentBuffer : public OSObject
-{
-	OSDeclareDefaultStructors(UHCIAlignmentBuffer)
-
-public:
-	
-	enum bufferType
-	{
-		kTypeCBI,
-		kTypeIsoch
-	};
-	
+typedef struct UHCIAlignmentBuffer {
     IOPhysicalAddress					paddr;
     IOVirtualAddress					vaddr;
 	
+    // For standard transfers
     IOMemoryDescriptor					*userBuffer;
     IOByteCount							userOffset;
-	IOByteCount							actCount;
-	AppleUSBUHCI						*controller;
-	AppleUSBUHCIDMACommand				*dmaCommand;
-	bufferType							type;
+	
+    // For isochronous transfers
+    IOVirtualAddress					userAddr;
+    IOByteCount							userLength;
+
+    // Fields used by filter interrupt routine
+    UHCIAlignmentBuffer					*next;
+    UInt32								frameNumber;
+    UInt32								copyAtInterruptTime;
 	
     // Queue fields
     queue_chain_t						chain;
-};
-
-
-class AppleUSBUHCIDMACommand : public IODMACommand
-{
-    OSDeclareDefaultStructors(AppleUSBUHCIDMACommand)
-	
-public:
-	
-	queue_head_t			_alignment_buffers;
-
-	// constructor
-    static AppleUSBUHCIDMACommand *		withSpecification(SegmentFunction  outSegFunc,
-														  UInt8            numAddressBits,
-														  UInt64           maxSegmentSize,
-														  MappingOptions   mappingOptions = kMapped,
-														  UInt64           maxTransferSize = 0,
-														  UInt32           alignment = 1,
-														  IOMapper        *mapper = 0,
-														  void            *refCon = 0);
-	
-	// overriden methods
-    virtual IOReturn		clearMemoryDescriptor(bool autoComplete = true);
-
-};
-
+} UHCIAlignmentBuffer;
 
 enum {
-    kUHCI_BUFFER_CBI_ALIGN_SIZE		= 64,
-	kUHCI_BUFFER_ISOCH_ALIGN_SIZE	= 1024,
-	kUHCI_BUFFER_ISOCH_ALIGN_QTY	= 24
+    kUHCI_BUFFER_ALIGN = 4
 };
 
 /* Checking for idleness.
@@ -243,8 +208,7 @@ enum
 };
 
 
-struct UHCIRHInterruptTransaction 
-{
+struct InterruptTransaction {
     IOMemoryDescriptor *		buf;
     UInt32						bufLen;
     IOUSBCompletion				completion;
@@ -292,9 +256,6 @@ protected:
     IOMemoryMap						*_ioMap;
     IOPhysicalAddress				_ioPhysAddress;
     IOVirtualAddress				_ioVirtAddress;
-	IOBufferMemoryDescriptor		*_frameListBuffer;
-	IOBufferMemoryDescriptor		*_cbiAlignBuffer;
-	IOBufferMemoryDescriptor		*_isochAlignBuffer;
     UInt16							_ioBase;
     UInt16							_vendorID;
     UInt16							_deviceID;
@@ -306,13 +267,12 @@ protected:
     bool							_uimInitialized;
     bool							_uhciAvailable;
     bool							_idleSuspend;
+	bool							_needToCreateRootHub;
 	bool							_wakingFromHibernation;
     
-	queue_head_t					_cbiAlignmentBuffers;			// alignment buffers for control/bulk/interrupt (64 byte buffers)
-	queue_head_t					_isochAlignmentBuffers;			// alignment buffers for isoch (1024 byte buffers)
-	SInt32							_uhciAlignmentHighWaterMark;
-	SInt32							_uhciAlignmentBuffersInUse;
-	
+    // Allocation of QHs and TDs 
+    queue_head_t					_allocatedBuffers;
+    
     // Timeouts
     AbsoluteTime					_lastTime;
     
@@ -324,6 +284,9 @@ protected:
     AbsoluteTime					_lastFrameNumberTime;
     UInt64							_lastTimeoutFrameNumber;
     
+    // Copying buffers at interrupt time
+    UHCIAlignmentBuffer				*_interruptAlignmentBuffers;
+
     // Interrupt status bits
     UInt32							_intrStatus;
 	UInt16							_hostControllerProcessInterrupt;
@@ -364,30 +327,26 @@ protected:
 	AppleUHCIQueueHead					*_pFreeQH;
 	AppleUHCIQueueHead					*_pLastFreeQH;
 	
-	// EHCI controller (if we are a companion)
-	AppleUSBEHCI						*_ehciController;
-	
     IOSimpleLock *						_isochScheduleLock;
     IOSimpleLock *						_wdhLock;
     UInt16								_outSlot;
 	UInt32								_controlBulkTransactionsOut;
-    thread_call_t						_rootHubCreationThread;
 
     IOReturn TDToUSBError(UInt32 error);
     void CompleteIsoc(IOUSBIsocCompletion completion, IOReturn status, void *pFrames);
     
     /* Root hub support. */
-    IOTimerEventSource						*_rhTimer;
-    UInt16									_rootFunctionNumber;
-	UInt8									_rootHubPollingRate;
-    UInt16									_lastPortStatus[kUHCI_NUM_PORTS];
-    bool									_portWasReset[kUHCI_NUM_PORTS];
-    bool									_portSuspendChange[kUHCI_NUM_PORTS];
-    AbsoluteTime							_rhChangeTime;
-    struct UHCIRHInterruptTransaction		_outstandingTrans[kMaxOutstandingTrans];
-    IOLock *								_intLock;
-	bool									_previousPortRecoveryAttempted[kUHCI_NUM_PORTS];
-    AbsoluteTime							_portRecoveryTime[kUHCI_NUM_PORTS];
+    IOTimerEventSource				*_rhTimer;
+    UInt16							_rootFunctionNumber;
+	UInt8							_rootHubPollingRate;
+    UInt16							_lastPortStatus[kUHCI_NUM_PORTS];
+    bool							_portWasReset[kUHCI_NUM_PORTS];
+    bool							_portSuspendChange[kUHCI_NUM_PORTS];
+    AbsoluteTime					_rhChangeTime;
+    struct InterruptTransaction		_outstandingTrans[kMaxOutstandingTrans];
+    IOLock *						_intLock;
+	bool							_previousPortRecoveryAttempted[kUHCI_NUM_PORTS];
+    AbsoluteTime					_portRecoveryTime[kUHCI_NUM_PORTS];
 
 	// Isoch support
 	volatile AppleUHCIIsochTransferDescriptor	*_savedDoneQueueHead;				// saved by the Filter Interrupt routine
@@ -407,14 +366,10 @@ protected:
     bool							RHAreAllPortsDisconnectedOrSuspended(void);
     void							RHCheckStatus(void);
 
-	static void						RootHubCreationEntry(OSObject *target);
-	void							RootHubCreation();
-
     // Port numbers are 1-based
     void							RHEnablePort(int port, bool enable);
     IOReturn						RHSuspendPort(int port, bool suspend);
     IOReturn						RHResetPort(int port);
-	IOReturn						RHHoldPortReset(int port);
     
     void							RHDumpPortStatus(int port); // Debugging.
     void							RHDumpHubPortStatus(IOUSBHubPortStatus *status);
@@ -454,8 +409,6 @@ protected:
     // Initializing hardware and setup
     IOReturn						HardwareInit(void);
     IOReturn						Run(bool);
-	IOReturn						InitializeAlignmentBuffers(void);
-	IOReturn						CheckForEHCIController(IOService*);
     
     // Memory management
 	AppleUHCITransferDescriptor			*AllocateTD(AppleUHCIQueueHead *);
@@ -490,23 +443,30 @@ protected:
     /*
      * Isochronous support.
      */
-    IOReturn								CreateIsochTransfer(IOUSBControllerIsochEndpoint* pEP, IOUSBIsocCommand *command);    
+    IOReturn								CreateIsochTransfer(	IOUSBControllerIsochEndpoint*		pEP,
+																	IOUSBIsocCompletion					completion,
+																	UInt64								frameNumberStart,
+																	IOMemoryDescriptor					*pBuffer,
+																	UInt32								frameCount,
+																	IOUSBIsocFrame						*pFrames,				// could be IOUSBLowLatencyIsocFrame*
+																	UInt32								updateFrequency = 0,
+																	bool								lowLatency = false,
+																	bool								requestFromRosettaClient = false);
+    
         
-	void									AddIsochFramesToSchedule(IOUSBControllerIsochEndpoint*);
-    IOReturn								AbortIsochEP(IOUSBControllerIsochEndpoint*);
-    IOReturn								DeleteIsochEP(IOUSBControllerIsochEndpoint*);
+	void							AddIsochFramesToSchedule(IOUSBControllerIsochEndpoint*);
+    IOReturn						AbortIsochEP(IOUSBControllerIsochEndpoint*);
+    IOReturn						DeleteIsochEP(IOUSBControllerIsochEndpoint*);
 
 	/*
      * Power management.
      */
     bool									_unloadUIMAcrossSleep;
-    bool									_remoteWakeupOccurred;
     UInt32									_saveFrameAddress;
     UInt16									_saveFrameNumber;
 	UInt16									_saveInterrupts;
+    bool									_remoteWakeupOccurred;
     IONotifier								*_powerDownNotifier;
-	UInt32									_ExpressCardPort;					// Port number of ExpressCard (0 if no ExpressCard on this controller)
-	bool									_badExpressCardAttached;			// True if a driver has identified a bad ExpressCard
     
     virtual void							initForPM (IOPCIDevice *provider);
     unsigned long							maxCapabilityForDomainState ( IOPMPowerFlags domainState );
@@ -515,8 +475,6 @@ protected:
 																	void *messageArgument, vm_size_t argSize);
     
     virtual IOReturn						setPowerState( unsigned long powerStateOrdinal, IOService* whatDevice );
-	
-	UInt32									ExpressCardPort( IOService * provider );
     
     void									ResumeController(void);
     void									SuspendController(void);
@@ -663,7 +621,6 @@ public:
 																USBDeviceAddress highSpeedHub,
 																int      highSpeedPort);
 
-	// obsolete method
     virtual IOReturn					UIMCreateIsochTransfer( short						functionAddress,
 																short						endpointNumber,
 																IOUSBIsocCompletion			completion,
@@ -673,7 +630,6 @@ public:
 																UInt32						frameCount,
 																IOUSBIsocFrame				*pFrames);
 
-	// obsolete method
     virtual IOReturn					UIMCreateIsochTransfer(short						functionAddress,
 															   short						endpointNumber,
 															   IOUSBIsocCompletion			completion,
@@ -684,9 +640,6 @@ public:
 															   IOUSBLowLatencyIsocFrame		*pFrames,
 															   UInt32						updateFrequency);
         
-	// new method
-	virtual IOReturn					UIMCreateIsochTransfer(IOUSBIsocCommand *command);
-
     virtual IOReturn UIMAbortEndpoint(short functionNumber, short endpointNumber, short direction);
     virtual IOReturn UIMDeleteEndpoint(short functionNumber, short endpointNumber, short direction);
     virtual IOReturn UIMClearEndpointStall(short functionNumber, short endpointNumber, short direction);
@@ -726,22 +679,21 @@ public:
 							   IOReturn							err);
     
     UInt32 findBufferRemaining(AppleUHCIQueueHead *pQH);
-	
-	// alignment buffers
-	UHCIAlignmentBuffer *						GetCBIAlignmentBuffer();
-	void										ReleaseCBIAlignmentBuffer(UHCIAlignmentBuffer*);
-	UHCIAlignmentBuffer *						GetIsochAlignmentBuffer();
-	void										ReleaseIsochAlignmentBuffer(UHCIAlignmentBuffer*);
-
-	IOReturn									InitializeBufferMemory();
-	void										FreeBufferMemory();
-
     
 	virtual IOUSBControllerIsochEndpoint*			AllocateIsochEP();
 
-    virtual IOReturn								GetLowLatencyOptionsAndPhysicalMask(IOOptionBits *optionBits, mach_vm_address_t *physicalMask);
-	virtual IODMACommand							*GetNewDMACommand();
-    virtual void									PutTDonDoneQueue(IOUSBControllerIsochEndpoint* pED, IOUSBControllerIsochListElement *pTD, bool checkDeferred);
 };
+
+class UHCIMemoryBuffer : public IOBufferMemoryDescriptor
+{
+    OSDeclareDefaultStructors(UHCIMemoryBuffer)
+
+protected:
+    virtual void free();
+public:
+    queue_chain_t _chain;
+    static UHCIMemoryBuffer *newBuffer(bool dmaable = true);
+};
+
 
 #endif /* ! _IOKIT_AppleUSBUHCI_H */

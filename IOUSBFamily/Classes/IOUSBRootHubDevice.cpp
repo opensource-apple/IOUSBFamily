@@ -127,27 +127,6 @@ IOUSBRootHubDevice::free()
 
 
 IOReturn
-IOUSBRootHubDevice::message( UInt32 type, IOService * provider,  void * argument )
-{
-	if (type == kIOUSBMessageRequestExtraPower)
-	{
-		if (_controller)
-		{
-			USBLog(2, "IOUSBRootHubDevice[%p]::message(kIOUSBMessageRequestExtraPower) - passing request up to controller", this);
-			return _controller->message(type, provider, argument);
-		}
-		else
-		{
-			USBLog(1, "IOUSBRootHubDevice[%p]::message(kIOUSBMessageRequestExtraPower) - no _controller", this);
-			return kIOReturnNoResources;
-		}
-	}
-	return super::message(type, provider, argument);
-}
-
-
-
-IOReturn
 IOUSBRootHubDevice::GatedDeviceRequest (OSObject *owner,  void *arg0,  void *arg1,  void *arg2,  void *arg3 )
 {
 	IOUSBRootHubDevice *me = (IOUSBRootHubDevice*)owner;

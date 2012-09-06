@@ -103,9 +103,6 @@ public:
     virtual void                        free();
     virtual bool                        willTerminate( IOService * provider, IOOptionBits options );
     virtual bool                        didTerminate( IOService * provider, IOOptionBits options, bool * defer );
-#if !(defined(__ppc__) && defined(KPI_10_4_0_PPC_COMPAT))
-    virtual IOReturn					message( UInt32 type, IOService * provider,  void * argument = 0 );
-#endif
 
     // pseudo IOKit methods - these methods are NOT the IOService:: methods, since both IOService::open
     // and IOService::close require an IOService* as the first parameter
@@ -166,12 +163,8 @@ public:
 
     // padding methods
     //
-#if !(defined(__ppc__) && defined(KPI_10_4_0_PPC_COMPAT))
     OSMetaClassDeclareReservedUsed(IOUSBDeviceUserClient,  0);
     virtual IOReturn                    DeviceReqInOOLv2(IOUSBDevRequestTO *reqIn, UInt32 *sizeOut, IOByteCount inCount, IOByteCount *outCount);
-#else
-    OSMetaClassDeclareReservedUnused(IOUSBDeviceUserClient,  0);
-#endif
 
     OSMetaClassDeclareReservedUnused(IOUSBDeviceUserClient,  1);
     OSMetaClassDeclareReservedUnused(IOUSBDeviceUserClient,  2);

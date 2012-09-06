@@ -41,7 +41,7 @@ static int kmod_compare(const void * a, const void * b)
     NSMutableArray *returnArray = [[NSMutableArray alloc] init];
     
     kern_return_t mach_result = KERN_SUCCESS;
-    mach_port_t host_port = MACH_PORT_NULL;
+    port_t host_port = PORT_NULL;
     kmod_info_t * kmod_list;
     mach_msg_type_number_t kmod_bytecount;  // not really used
     int kmod_count;
@@ -114,7 +114,7 @@ finish:
         * leaks. We don't care about the kern_return_t value of this
         * call for now as there's nothing we can do if it fails.
         */
-        if (MACH_PORT_NULL != host_port) {
+        if (PORT_NULL != host_port) {
             mach_port_deallocate(mach_task_self(), host_port);
         }
     
@@ -128,9 +128,8 @@ finish:
 + (NSMutableArray *)loadedExtensionsContainingString:(NSString *)string {
     NSMutableArray *returnArray = [NSMutableArray arrayWithArray:[KextInfoGatherer loadedExtensions]];
     if (returnArray != nil) {
-		NSArray * arrayCopy = [ returnArray copy ];
-        NSEnumerator *enumerator = [arrayCopy objectEnumerator];
-        NSDictionary *thisKext = NULL;
+        NSEnumerator *enumerator = [returnArray objectEnumerator];
+        NSDictionary *thisKext;
         
         while (thisKext = [enumerator nextObject]) {
             if ([[thisKext objectForKey:@"Name"] rangeOfString:string options:NSCaseInsensitiveSearch].location == NSNotFound) {

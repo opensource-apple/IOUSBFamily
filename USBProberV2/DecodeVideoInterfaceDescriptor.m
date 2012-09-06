@@ -54,13 +54,13 @@
     auto IOUSBVDC_UncompressedFormatDescriptor * pUncompressedFormatDesc = NULL;
     auto IOUSBVDC_UncompressedFrameDescriptor * pUncompressedFrameDesc = NULL;
     auto IOUSBVDC_UncompressedDiscreteFrameDescriptor * pUncompressedDiscreteFrameDesc = NULL;
-	auto IOUSBVDC_StillImageFrameDescriptor * pVSStillImageFrameDesc = NULL;
 
     UInt16					i, j;
     UInt8					*p;
     UInt32					*t;
     char					*s = NULL;
     IOUSBVCInterfaceDescriptor *                desc = (IOUSBVCInterfaceDescriptor *) descriptor;
+    UInt64					uuidHI;
     UInt64					uuidLO;
     UInt32                                      data1;
     UInt16                                      data2, data3;
@@ -600,14 +600,20 @@
                 sprintf((char *)buf, 	"%u", pExtensionUnitDesc->bUnitID );
                 [thisDevice addProperty:"Unit ID:" withValue:buf atDepth:INTERFACE_LEVEL+1];
 
-				data1 = USBToHostLong(* (UInt32 *) &pExtensionUnitDesc->guidFormat[0]);
-				data2 = USBToHostWord(* (UInt16 *) &pExtensionUnitDesc->guidFormat[4]);
-				data3 = USBToHostWord(* (UInt16 *) &pExtensionUnitDesc->guidFormat[6]);
-				uuidLO = NXSwapBigLongLongToHost(* (UInt64 *) &pExtensionUnitDesc->guidFormat[8]);
-				
-				
-				sprintf((char *)buf, 	"%8.8lx-%4.4x-%4.4x-%4.4lx-%12.12qx", data1, data2, data3, 
-						(UInt32) ( (uuidLO & 0xffff000000000000ULL)>>48), (uuidLO & 0x0000FFFFFFFFFFFFULL) );
+                uuidHI = pExtensionUnitDesc->guidExtensionCodeHi;
+                uuidLO = pExtensionUnitDesc->guidExtensionCodeLo;
+                
+                // Decode the GUID per section 2.9 of the FAQ
+                //
+                data1 = (uuidHI >> 32 );
+                Swap32(&data1);
+                data2 = (uuidHI >> 16 ) & 0x0000ffff;
+                Swap16(&data2);
+                data3 = (uuidHI & 0x0000ffff);
+                Swap16(&data3);
+                
+                sprintf((char *)buf, 	"%8.8lx-%4.4x-%4.4x-%4.4lx-%12.12qx", data1, data2, data3, 
+                        (UInt32) ( (uuidLO & 0xffff000000000000ULL)>>48), (uuidLO & 0x0000FFFFFFFFFFFFULL) );
                 [thisDevice addProperty:"Vendor UUID:" withValue:buf atDepth:INTERFACE_LEVEL+1];
 
                 sprintf((char *)buf, 	"%u", pExtensionUnitDesc->bNumControls );
@@ -702,21 +708,13 @@
                         sprintf((char *)buf, 	"%u (%s)", pVSInputHeaderDesc->bStillCaptureMethod, s );
                         [thisDevice addProperty:"bStillCaptureMethod:" withValue:buf atDepth:INTERFACE_LEVEL+1];
                         
-				sprintf((char *)buf, "%s", pVSInputHeaderDesc->bTriggerSupport ? "1 (Supported)" : "0 (Not Supported)");
+                        sprintf((char *)buf, "%s", pVSInputHeaderDesc->bTriggerSupport ? "Supported" : "Not Supported");
                         [thisDevice addProperty:"bTriggerSupport" withValue:buf atDepth:INTERFACE_LEVEL+1];
                         
-				if ( pVSInputHeaderDesc->bTriggerSupport )
-				{
-					sprintf((char *)buf, "%s", pVSInputHeaderDesc->bTriggerUsage ? "1 (General Purpose)" : "(0) Initiate Still Image Capture");
-				}
-					else
-					{
-						sprintf((char *)buf, "%s", "Ignored because bTriggerSupport is 0");
-					}
+                        sprintf((char *)buf, "%s", pVSInputHeaderDesc->bTriggerUsage ? "General Purpose" : "Initiate Still Image Capture");
                         [thisDevice addProperty:"bTriggerUsage" withValue:buf atDepth:INTERFACE_LEVEL+1];
                         
                         sprintf((char *)buf, "0x%x", pVSInputHeaderDesc->bControlSize );
-				
                         [thisDevice addProperty:"bControlSize:" withValue:buf atDepth:INTERFACE_LEVEL+1];
 
                         for (j = 0; j < pVSInputHeaderDesc->bNumFormats; j++ )
@@ -1010,11 +1008,14 @@
                         
                         // Decode the GUID per section 2.9 of the FAQ
                         //
-                        data1 = USBToHostLong(* (UInt32 *) &pUncompressedFormatDesc->guidFormat[0]);
-                        data2 = USBToHostWord(* (UInt16 *) &pUncompressedFormatDesc->guidFormat[4]);
-                        data3 = USBToHostWord(* (UInt16 *) &pUncompressedFormatDesc->guidFormat[6]);
-						uuidLO = NXSwapBigLongLongToHost(* (UInt64 *) &pUncompressedFormatDesc->guidFormat[8]);
-
+                        uuidHI = pUncompressedFormatDesc->guidFormatHi;
+                        uuidLO = pUncompressedFormatDesc->guidFormatLo;
+                        data1 = (uuidHI >> 32 );
+                        Swap32(&data1);
+                        data2 = (uuidHI >> 16 ) & 0x0000ffff;
+                        Swap16(&data2);
+                        data3 = (uuidHI & 0x0000ffff);
+                        Swap16(&data3);
                         
                         sprintf((char *)buf, 	"%8.8lx-%4.4x-%4.4x-%4.4lx-%12.12qx", data1, data2, data3, 
                                 (UInt32) ( (uuidLO & 0xffff000000000000ULL)>>48), (uuidLO & 0x0000FFFFFFFFFFFFULL) );
@@ -1144,40 +1145,6 @@
                             break;
                         
                         
-			case VS_STILL_IMAGE_FRAME:
-				pVSStillImageFrameDesc = (IOUSBVDC_StillImageFrameDescriptor *)desc;
-				
-				sprintf((char *)buf, "0x%x", pVSStillImageFrameDesc->bEndpointAddress );
-				[thisDevice addProperty:"bEndpointAddress:" withValue:buf atDepth:INTERFACE_LEVEL+1];
-				
-				sprintf((char *)buf, "%d", pVSStillImageFrameDesc->bNumImageSizePatterns );
-				[thisDevice addProperty:"bNumImageSizePatterns" withValue:buf atDepth:INTERFACE_LEVEL+1];
-						
-				IOSUBVDC_StillImageSize	*	dimensions;
-				
-				for (j = 0; j < pVSStillImageFrameDesc->bNumImageSizePatterns; j++ )
-				{
-					dimensions = (IOSUBVDC_StillImageSize *)&pVSStillImageFrameDesc->dwSize[j];
-					
-					sprintf((char *)buf, "Width: %d, Height: %d", OSSwapLittleToHostInt16( dimensions->wWidth), OSSwapLittleToHostInt16(dimensions->wHeight) );
-					sprintf((char *)buf2, "wWidth[%d], wHeight[%d]", j+1, j+1 );
-
-					[thisDevice addProperty:buf2 withValue:buf atDepth:INTERFACE_LEVEL+2];
-				}
-					
-				IOSUBVDC_StillImageCompressionPattern *	pattern = (IOSUBVDC_StillImageCompressionPattern *) &pVSStillImageFrameDesc->dwSize[j];
-				sprintf((char *)buf, "%d", pattern->bNumCompressionPattern );
-				[thisDevice addProperty:"bCompressionPatterns" withValue:buf atDepth:INTERFACE_LEVEL+2];
-
-				for (j = 0; j < pattern->bNumCompressionPattern; j++ )
-				{
-					sprintf((char *)buf, "%d", pattern->bCompression[j] );
-					sprintf((char *)buf2, "bCompression[%d]", j+1);
-					
-					[thisDevice addProperty:buf2 withValue:buf atDepth:INTERFACE_LEVEL+3];
-				}
-					
-					break;
                     // default:
                 }
      }       

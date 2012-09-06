@@ -26,11 +26,9 @@ extern "C" {
 #include <kern/clock.h>
 }
 
-#include <libkern/OSByteOrder.h>
-
 #include <IOKit/usb/USB.h>
 #include <IOKit/usb/IOUSBLog.h>
-#include <IOKit/usb/IOUSBRootHubDevice.h>
+#include <libkern/OSByteOrder.h>
 
 #include "AppleUSBOHCI.h"
 
@@ -718,12 +716,12 @@ OSMetaClassDefineReservedUsed(IOUSBController,  10);
 void 
 AppleUSBOHCI::UIMRootHubStatusChange(bool abort)
 {
-    UInt32									tempStatus, hubStatus, portStatus, statusBit;
-    UInt16									statusChangedBitmap;   /* only have 15 ports in OHCI */
-    UInt8									numPorts = 0;
-    unsigned int							index, port, move;
-    struct OHCIRHInterruptTransaction		last;
-    UInt32									descriptorA;
+    UInt32 		tempStatus, hubStatus, portStatus, statusBit;
+    UInt16 		statusChangedBitmap;   /* only have 15 ports in OHCI */
+    UInt8		numPorts = 0;
+    unsigned int      	index, port, move;
+    struct InterruptTransaction last;
+    UInt32		descriptorA;
     
     /* turn off RHSC interrupt */
     _pOHCIRegisters->hcInterruptDisable = HostToUSBLong(kOHCIHcInterrupt_RHSC);
@@ -864,7 +862,7 @@ void AppleUSBOHCI::SimulateRootHubInt(UInt8							endpoint,
 			
 			if ( elapsedTime < kOHCIRootHubPollingInterval )
 			{
-				USBLog(5, "AppleUSBOHCI[%p]::SimulateRootHubInt  Last change was %qd ms ago.  IOSleep'ing for %qd ms, _workLoop->inGate = %d",  this, elapsedTime, kOHCIRootHubPollingInterval - elapsedTime, _workLoop->inGate() );
+				USBLog(5, "AppleUSBOHCI[%p]::SimulateRootHubInt  Last change was %qd ms ago.  IOSleep'ing for %qd ms",  this, elapsedTime, kOHCIRootHubPollingInterval - elapsedTime );
 				IOSleep( kOHCIRootHubPollingInterval - elapsedTime );
 			}
 
@@ -1077,56 +1075,4 @@ AppleUSBOHCI::GetRootHubStringDescriptor(UInt8	index, OSData *desc)
 }
 
 
-
-void
-AppleUSBOHCI::RootHubCreationEntry(OSObject *target)
-{
-    AppleUSBOHCI *			me = OSDynamicCast(AppleUSBOHCI, target);
-	
-    if (!me )
-        return;
-	
-    me->retain();
-    me->RootHubCreation();
-    me->release();
-}
-
-
-
-void
-AppleUSBOHCI::RootHubCreation()
-{
-	IOReturn	err;
-	
-	USBLog(5,"AppleUSBOHCI[%p]::RootHubCreation - bus %d", this, (int)_busNumber);
-	
-	if (_ehciController)
-		_ehciController->SynchronizeCompanionRootHub(this);
-	else
-	{
-		USBLog(2,"AppleUSBOHCI[%p]::RootHubCreation - no EHCI controller", this);
-	}
-	
-	USBLog(5,"AppleUSBOHCI[%p]::RootHubCreation - bus %d, powering up hardware", this, (int)_busNumber);
-
-	// Initialize the hardware
-	//
-	UIMInitializeForPowerUp();
-	
-	IOSleep(20);									// wait 20 ms after power on before we actually create the root hub
-	_ohciAvailable = true;                          // tell the interrupt filter routine that we are on
-	_ohciBusState = kOHCIBusStateRunning;
-	
-	if ( _rootHubDevice == NULL )
-	{
-		err = CreateRootHubDevice( _device, &_rootHubDevice );
-		if ( err != kIOReturnSuccess )
-		{
-			USBError(1,"AppleUSBOHCI[%p]::RootHubCreation - Could not create root hub device upon wakeup (%x)!", this, err);
-		}
-		else
-		{
-			_rootHubDevice->registerService(kIOServiceRequired | kIOServiceSynchronous);
-		}
-	}
-}
+    

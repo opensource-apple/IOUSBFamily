@@ -40,8 +40,8 @@ IOUSBCommand::NewCommand()
     
     if (me && !me->init())
     {
-		me->release();
-		me = NULL;
+	me->release();
+	me = NULL;
     }
     return me;
 }
@@ -56,13 +56,13 @@ IOUSBCommand::init()
     // allocate our expansion data
     if (!_expansionData)
     {
-		_expansionData = (ExpansionData *)IOMalloc(sizeof(ExpansionData));
-		if (!_expansionData)
-			return false;
-		bzero(_expansionData, sizeof(ExpansionData));
+	_expansionData = (ExpansionData *)IOMalloc(sizeof(ExpansionData));
+	if (!_expansionData)
+	    return false;
+	bzero(_expansionData, sizeof(ExpansionData));
     }
     return true;
-}
+ }
 
 
 void 
@@ -73,10 +73,10 @@ IOUSBCommand::free()
     //
     if (_expansionData)
     {
-		IOFree(_expansionData, sizeof(ExpansionData));
+	IOFree(_expansionData, sizeof(ExpansionData));
         _expansionData = NULL;
     }
-	
+
     super::free();
 }
 
@@ -144,28 +144,19 @@ IOUSBCommand::SetClientCompletion(IOUSBCompletion completion)
 void 
 IOUSBCommand::SetDataRemaining(UInt32 dr) 
 {
-	if (_expansionData->_masterUSBCommand)
-		_expansionData->_masterUSBCommand->_dataRemaining = dr;
-	else
-		_dataRemaining = dr;
+    _dataRemaining = dr;
 }
 
 void 
 IOUSBCommand::SetStage(UInt8 stage) 
 {
-	if (_expansionData->_masterUSBCommand)
-		_expansionData->_masterUSBCommand->_stage = stage;
-	else
-		_stage = stage;
+    _stage = stage;
 }
 
 void 
 IOUSBCommand::SetStatus(IOReturn stat) 
 {
-	if (_expansionData->_masterUSBCommand)
-		_expansionData->_masterUSBCommand->_status = stat;
-	else
-		_status = stat;
+    _status = stat;
 }
 
 void 
@@ -201,11 +192,8 @@ IOUSBCommand::SetCompletionTimeout(UInt32 to)
 void 
 IOUSBCommand::SetUIMScratch(UInt32 index, UInt32 value) 
 { 
-    if (index < 10)
-		if (_expansionData->_masterUSBCommand)
-			_expansionData->_masterUSBCommand->_UIMScratch[index] = value;
-		else
-			_UIMScratch[index] = value;
+    if (index < 10) 
+        _UIMScratch[index] = value;
 }
 
 void 
@@ -260,185 +248,143 @@ IOUSBCommand::SetIsSyncTransfer(bool isSync)
 }
 
 
-void					
-IOUSBCommand::SetBufferUSBCommand(IOUSBCommand *bufferUSBCommand)
-{
-	if (!bufferUSBCommand && (_expansionData->_bufferUSBCommand))
-		_expansionData->_bufferUSBCommand->_expansionData->_masterUSBCommand = NULL;
-	
-	_expansionData->_bufferUSBCommand = bufferUSBCommand;
-	
-	if (bufferUSBCommand)
-		bufferUSBCommand->_expansionData->_masterUSBCommand = this; 
-}
-
-
 usbCommand 
 IOUSBCommand::GetSelector(void) 
 {
-	// This one can be different for the two command (master and buffer)
-	return _selector;
+    return _selector;
 }
 
 IOUSBDeviceRequestPtr 
 IOUSBCommand::GetRequest(void) 
 {
-	return _expansionData->_masterUSBCommand ? _expansionData->_masterUSBCommand->_request : _request;
+    return _request;
 }
 
-USBDeviceAddress 
-IOUSBCommand::GetAddress(void) 
+USBDeviceAddress IOUSBCommand::GetAddress(void) 
 {
-	return _expansionData->_masterUSBCommand ? _expansionData->_masterUSBCommand->_address : _address;
+    return _address;
 }
 
-UInt8 
-IOUSBCommand::GetEndpoint(void) 
+UInt8 IOUSBCommand::GetEndpoint(void) 
 {
-	return _expansionData->_masterUSBCommand ? _expansionData->_masterUSBCommand->_endpoint : _endpoint;
+    return _endpoint;
 }
 
-UInt8 
-IOUSBCommand::GetDirection(void) 
+UInt8 IOUSBCommand::GetDirection(void) 
 {
-	return _expansionData->_masterUSBCommand ? _expansionData->_masterUSBCommand->_direction : _direction;
+    return _direction;
 }
 
-UInt8 
-IOUSBCommand::GetType(void) 
+UInt8 IOUSBCommand::GetType(void) 
 {
-	return _expansionData->_masterUSBCommand ? _expansionData->_masterUSBCommand->_type : _type;
+    return _type;
 }
 
-bool 
-IOUSBCommand::GetBufferRounding(void) 
+bool IOUSBCommand::GetBufferRounding(void) 
 {
     return _bufferRounding;
 }
 
-IOMemoryDescriptor* 
-IOUSBCommand::GetBuffer(void) 
+IOMemoryDescriptor* IOUSBCommand::GetBuffer(void) 
 { 
-	return _expansionData->_masterUSBCommand ? _expansionData->_masterUSBCommand->_buffer : _buffer;
+    return _buffer;
 }
 
-IOUSBCompletion 
-IOUSBCommand::GetUSLCompletion(void) 
+IOUSBCompletion IOUSBCommand::GetUSLCompletion(void) 
 { 
-	return _expansionData->_masterUSBCommand ? _expansionData->_masterUSBCommand->_uslCompletion : _uslCompletion;
+    return _uslCompletion;
 }
 
-IOUSBCompletion 
-IOUSBCommand::GetClientCompletion(void) 
+IOUSBCompletion IOUSBCommand::GetClientCompletion(void) 
 { 
-	return _expansionData->_masterUSBCommand ? _expansionData->_masterUSBCommand->_clientCompletion : _clientCompletion;
+    return _clientCompletion;
 }
 
-UInt32 
-IOUSBCommand::GetDataRemaining(void) 
+UInt32 IOUSBCommand::GetDataRemaining(void) 
 { 
-	return _expansionData->_masterUSBCommand ? _expansionData->_masterUSBCommand->_dataRemaining : _dataRemaining;
+    return _dataRemaining;
 }
 
-UInt8 
-IOUSBCommand::GetStage(void) 
+UInt8 IOUSBCommand::GetStage(void) 
 { 
-	return _expansionData->_masterUSBCommand ? _expansionData->_masterUSBCommand->_stage : _stage;
+    return _stage;
 }
 
-IOReturn 
-IOUSBCommand::GetStatus(void) 
+IOReturn IOUSBCommand::GetStatus(void) 
 { 
-	return _expansionData->_masterUSBCommand ? _expansionData->_masterUSBCommand->_status : _status;
+    return _status;
 }
 
-IOMemoryDescriptor * 
-IOUSBCommand::GetOrigBuffer(void) 
+IOMemoryDescriptor * IOUSBCommand::GetOrigBuffer(void) 
 { 
-	return _expansionData->_masterUSBCommand ? _expansionData->_masterUSBCommand->_origBuffer : _origBuffer;
+    return _origBuffer;
 }
 
-IOUSBCompletion 
-IOUSBCommand::GetDisjointCompletion(void) 
+IOUSBCompletion IOUSBCommand::GetDisjointCompletion(void) 
 { 
-	return _expansionData->_masterUSBCommand ? _expansionData->_masterUSBCommand->_disjointCompletion : _disjointCompletion;
+    return _disjointCompletion;
 }
 
-IOByteCount 
-IOUSBCommand::GetDblBufLength(void) 
+IOByteCount IOUSBCommand::GetDblBufLength(void) 
 { 
-	return _expansionData->_masterUSBCommand ? _expansionData->_masterUSBCommand->_dblBufLength : _dblBufLength;
+    return _dblBufLength;
 }
 
-UInt32 
-IOUSBCommand::GetNoDataTimeout(void) 
+UInt32 IOUSBCommand::GetNoDataTimeout(void) 
 { 
-	return _expansionData->_masterUSBCommand ? _expansionData->_masterUSBCommand->_noDataTimeout : _noDataTimeout;
+    return _noDataTimeout;
 }
 
-UInt32 
-IOUSBCommand::GetCompletionTimeout(void) 
+UInt32 IOUSBCommand::GetCompletionTimeout(void) 
 {
-	return _expansionData->_masterUSBCommand ? _expansionData->_masterUSBCommand->_completionTimeout : _completionTimeout;
+    return _completionTimeout;
 }
 
 UInt32 IOUSBCommand::GetUIMScratch(UInt32 index) 
 { 
-	if (index < 10)
-		return _expansionData->_masterUSBCommand ? _expansionData->_masterUSBCommand->_UIMScratch[index] : _UIMScratch[index];
-	else
-		return 0;
+    return (index < 10) ? _UIMScratch[index] : 0;
 }
-
-IOByteCount 
-IOUSBCommand::GetReqCount(void) 
+ 
+IOByteCount IOUSBCommand::GetReqCount(void) 
 { 
     return _expansionData->_reqCount;
 }
 
-IOMemoryDescriptor*
-IOUSBCommand::GetRequestMemoryDescriptor(void)
+IOMemoryDescriptor *IOUSBCommand::GetRequestMemoryDescriptor(void)
 {
-	return _expansionData->_masterUSBCommand ? _expansionData->_masterUSBCommand->_expansionData->_requestMemoryDescriptor : _expansionData->_requestMemoryDescriptor;
+    return _expansionData->_requestMemoryDescriptor;
 }
 
-// this one is different in that the buffer command (the child) will use this for its own memory descriptor
-IOMemoryDescriptor*
-IOUSBCommand::GetBufferMemoryDescriptor(void)
+IOMemoryDescriptor *IOUSBCommand::GetBufferMemoryDescriptor(void)
 {
     return _expansionData->_bufferMemoryDescriptor;
 }
 
 
-bool 
-IOUSBCommand::GetMultiTransferTransaction(void)
+bool IOUSBCommand::GetMultiTransferTransaction(void)
 {
-	return _expansionData->_masterUSBCommand ? _expansionData->_masterUSBCommand->_expansionData->_multiTransferTransaction : _expansionData->_multiTransferTransaction;
+    return _expansionData->_multiTransferTransaction;
 }
 
 
-bool 
-IOUSBCommand::GetFinalTransferInTransaction(void)
+bool IOUSBCommand::GetFinalTransferInTransaction(void)
 {
-	return _expansionData->_masterUSBCommand ? _expansionData->_masterUSBCommand->_expansionData->_finalTransferInTransaction : _expansionData->_finalTransferInTransaction;
+    return _expansionData->_finalTransferInTransaction;
 }
 
-bool 
-IOUSBCommand::GetUseTimeStamp(void)
+bool IOUSBCommand::GetUseTimeStamp(void)
 {
-	return _expansionData->_masterUSBCommand ? _expansionData->_masterUSBCommand->_expansionData->_useTimeStamp : _expansionData->_useTimeStamp;
+    return _expansionData->_useTimeStamp;
 }
 
-AbsoluteTime 
-IOUSBCommand::GetTimeStamp(void)
+AbsoluteTime IOUSBCommand::GetTimeStamp(void)
 {
-	return _expansionData->_masterUSBCommand ? _expansionData->_masterUSBCommand->_expansionData->_timeStamp : _expansionData->_timeStamp;
+    return _expansionData->_timeStamp;
 }
 
-bool 
-IOUSBCommand::GetIsSyncTransfer(void)
+bool IOUSBCommand::GetIsSyncTransfer(void)
 {
-	return _expansionData->_masterUSBCommand ? _expansionData->_masterUSBCommand->_expansionData->_isSyncTransfer : _expansionData->_isSyncTransfer;
+    return _expansionData->_isSyncTransfer;
 }
 
 
@@ -449,8 +395,8 @@ IOUSBIsocCommand::NewCommand()
     
     if (me && !me->init())
     {
-		me->release();
-		me = NULL;
+	me->release();
+	me = NULL;
     }
     return me;
 }
@@ -463,13 +409,13 @@ IOUSBIsocCommand::init()
     // allocate our expansion data
     if (!_expansionData)
     {
-		_expansionData = (ExpansionData *)IOMalloc(sizeof(ExpansionData));
-		if (!_expansionData)
-			return false;
-		bzero(_expansionData, sizeof(ExpansionData));
+	_expansionData = (ExpansionData *)IOMalloc(sizeof(ExpansionData));
+	if (!_expansionData)
+	    return false;
+	bzero(_expansionData, sizeof(ExpansionData));
     }
     return true;
-}
+ }
 
 
 void 
@@ -480,7 +426,7 @@ IOUSBIsocCommand::free()
     //
     if (_expansionData)
     {
-		IOFree(_expansionData, sizeof(ExpansionData));
+	IOFree(_expansionData, sizeof(ExpansionData));
         _expansionData = NULL;
     }
     super::free();

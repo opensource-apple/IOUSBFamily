@@ -32,7 +32,7 @@
 #include "UHCI.h"
 
 
-class AppleUHCIqhMemoryBlock : public OSObject
+class AppleUHCIqhMemoryBlock : public IOBufferMemoryDescriptor
 {
     OSDeclareDefaultStructors(AppleUHCIqhMemoryBlock);
     
@@ -42,7 +42,6 @@ private:
     IOPhysicalAddress							_sharedPhysical;
     UHCIQueueHeadSharedPtr						_sharedLogical;
     AppleUHCIqhMemoryBlock						*_nextBlock;
-	IOBufferMemoryDescriptor					*_buffer;
     
 public:
 		
@@ -55,3 +54,4 @@ public:
 };
 
 
+#endif

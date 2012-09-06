@@ -94,7 +94,7 @@
     return [finalString autorelease];
 }
 
-- (BOOL)validateMenuItem:(NSMenuItem *)menuItem {
+- (BOOL)validateMenuItem:(id <NSMenuItem>)menuItem {
     if ([NSStringFromSelector([menuItem action]) isEqualToString:@"copy:"]) {
         return ([self selectedRow] != -1);
     } else {

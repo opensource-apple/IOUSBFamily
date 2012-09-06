@@ -96,7 +96,7 @@
     if (result == NSOKButton) {
         NSString *finalString = [_rootNode stringRepresentationOfValues:0];
 
-        if (![finalString writeToFile:[sp filename] atomically:YES encoding:NSUTF8StringEncoding error:NULL])
+        if (![finalString writeToFile:[sp filename] atomically:YES])
             NSBeep();
     }
 }
@@ -199,7 +199,7 @@
         return [item value];
     } else if (ov = IORegDetailedOutput) {
         if ([[tableColumn identifier] intValue] == 0) {
-            return [(OutlineViewNode *)item name];
+            return [item name];
         } else if ([[tableColumn identifier] intValue] == 1) {
             return [(IORegDetailOutlineViewNode *)item type];
         } else if ([[tableColumn identifier] intValue] == 2) {
@@ -220,7 +220,7 @@
 - (void)ioregItemSingleClicked:(id)sender {
         if ([IORegDetailedOutputDrawer state] == NSDrawerOpenState) {
             IORegOutlineViewNode *item = [sender itemAtRow:[sender selectedRow]];
-            if ([item representedDevice] != IO_OBJECT_NULL) {
+            if ([item representedDevice] != nil) {
                 NSMutableDictionary *propertiesDict;
 
                 if (IORegistryEntryCreateCFProperties( [item representedDevice], (CFMutableDictionaryRef *)&propertiesDict, kCFAllocatorDefault, 0 ) == 0) {

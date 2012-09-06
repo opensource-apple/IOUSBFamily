@@ -78,7 +78,7 @@
             [finalString appendFormat:@"%@",thisDevice];
         }
         
-        if (![finalString writeToFile:[sp filename] atomically:YES encoding:NSUTF8StringEncoding error:NULL])
+        if (![finalString writeToFile:[sp filename] atomically:YES])
             NSBeep();
         
         [finalString release];
@@ -148,7 +148,7 @@
         if ([item class] == [BusProbeDevice class]) {
             return [[(BusProbeDevice *)item rootNode] name];
         }
-        return [(OutlineViewNode *)item name];
+        return [item name];
     } else {
         if ([item class] == [BusProbeDevice class]) {
             return [[(BusProbeDevice *)item rootNode] value];

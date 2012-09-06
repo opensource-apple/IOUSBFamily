@@ -28,25 +28,24 @@
 #include "AppleUSBEHCI.h"
 #include "USBEHCI.h"
 
-class AppleEHCIitdMemoryBlock : public OSObject
+class AppleEHCIitdMemoryBlock : public IOBufferMemoryDescriptor
 {
-	OSDeclareDefaultStructors(AppleEHCIitdMemoryBlock)
+    OSDeclareDefaultStructors(AppleEHCIitdMemoryBlock);
     
 #define ITDsPerBlock	(kEHCIPageSize / sizeof(EHCIIsochTransferDescriptorShared))
 
 private:
-    IOPhysicalAddress						_sharedPhysical;
+    IOPhysicalAddress				_sharedPhysical;
     EHCIIsochTransferDescriptorSharedPtr	_sharedLogical;
-    AppleEHCIitdMemoryBlock					*_nextBlock;
-	IOBufferMemoryDescriptor				*_buffer;
+    AppleEHCIitdMemoryBlock			*_nextBlock;
     
 public:
 
-    static AppleEHCIitdMemoryBlock			*NewMemoryBlock(void);
-    void									SetNextBlock(AppleEHCIitdMemoryBlock *next);
-    AppleEHCIitdMemoryBlock					*GetNextBlock(void);
-    UInt32									NumTDs(void);
-    IOPhysicalAddress						GetPhysicalPtr(UInt32 index);
+    static AppleEHCIitdMemoryBlock 		*NewMemoryBlock(void);
+    void					SetNextBlock(AppleEHCIitdMemoryBlock *next);
+    AppleEHCIitdMemoryBlock			*GetNextBlock(void);
+    UInt32					NumTDs(void);
+    IOPhysicalAddress				GetPhysicalPtr(UInt32 index);
     EHCIIsochTransferDescriptorSharedPtr	GetLogicalPtr(UInt32 index);
     
 };

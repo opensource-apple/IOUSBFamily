@@ -33,11 +33,6 @@
 #include <IOKit/usb/IOUSBCommand.h>
 #endif
 
-// OHCI needed for error codes which we translate to
-#ifndef _USBOHCI_H_
-#include "USBOHCI.h"
-#endif
-
 #define		APPLE_USB_EHCI_64	1
 
 
@@ -103,8 +98,6 @@ enum
 };
 #define kEHCIPageOffsetMask	( kEHCIPageSize - 1 )		// mask off just the offset bits (low 12)
 #define kEHCIPageMask 		(~(kEHCIPageOffsetMask))	// mask off just the page number (high 20)
-
-#define	kEHCIStructureAllocationPhysicalMask	0x00000000FFFFF000ULL			// for use with inTaskWithPhysicalMask (below 4GB and 4K aligned)
 
 enum{
 	kEHCIMaxPoll 			= 256,
@@ -183,35 +176,35 @@ enum{
 enum
 {
 	// Endpoint Characteristics - see EHCI spec table 3-19
-	kEHCIEDFlags_FA				= EHCIBitRange (0,  6),
+	kEHCIEDFlags_FA			= EHCIBitRange (0,  6),
 	kEHCIEDFlags_FAPhase		= EHCIBitRangePhase (0, 6),
-	kEHCIEDFlags_EN				= EHCIBitRange (8, 11),
+	kEHCIEDFlags_EN			= EHCIBitRange (8, 11),
 	kEHCIEDFlags_ENPhase		= EHCIBitRangePhase (8, 11),
-	kEHCIEDFlags_S				= EHCIBitRange (12, 13),
-	kEHCIEDFlags_SPhase			= EHCIBitRangePhase (12, 13),
-	kEHCIEDFlags_MPS			= EHCIBitRange (16, 26),
+	kEHCIEDFlags_S			= EHCIBitRange (12, 13),
+	kEHCIEDFlags_SPhase		= EHCIBitRangePhase (12, 13),
+	kEHCIEDFlags_MPS		= EHCIBitRange (16, 26),
 	kEHCIEDFlags_MPSPhase		= EHCIBitRangePhase (16, 26),
 
-	kEHCIEDFlags_C				= EHCIBitRange (27, 27),
-	kEHCIEDFlags_CPhase			= EHCIBitRangePhase (27, 27),
-	kEHCIEDFlags_H				= EHCIBitRange (15, 15),
-	kEHCIEDFlags_HPhase			= EHCIBitRangePhase (15, 15),
-	kEHCIEDFlags_DTC			= EHCIBitRange (14, 14),
+	kEHCIEDFlags_C			= EHCIBitRange (27, 27),
+	kEHCIEDFlags_CPhase		= EHCIBitRangePhase (27, 27),
+	kEHCIEDFlags_H			= EHCIBitRange (15, 15),
+	kEHCIEDFlags_HPhase		= EHCIBitRangePhase (15, 15),
+	kEHCIEDFlags_DTC		= EHCIBitRange (14, 14),
 	kEHCIEDFlags_DTCPhase		= EHCIBitRangePhase (14, 14),
 
 	// Endpoint capabilities - see EHCI spec table 3-20 
-	kEHCIEDSplitFlags_Mult				= EHCIBitRange (30, 31),
-	kEHCIEDSplitFlags_MultPhase			= EHCIBitRangePhase (30, 31),
-	kEHCIEDSplitFlags_Port				= EHCIBitRange (23, 29),
-	kEHCIEDSplitFlags_PortPhase			= EHCIBitRangePhase (23, 29),
-	kEHCIEDSplitFlags_HubAddr			= EHCIBitRange (16, 22),
-	kEHCIEDSplitFlags_HubAddrPhase		= EHCIBitRangePhase (16, 22),
-	kEHCIEDSplitFlags_CMask				= EHCIBitRange (8, 15),
-	kEHCIEDSplitFlags_CMaskPhase		= EHCIBitRangePhase (8, 15),
-	kEHCIEDSplitFlags_SMask				= EHCIBitRange (0, 7),
-	kEHCIEDSplitFlags_SMaskPhase		= EHCIBitRangePhase (0, 7),
+	kEHCIEDSplitFlags_Mult		= EHCIBitRange (30, 31),
+	kEHCIEDSplitFlags_MultPhase	= EHCIBitRangePhase (30, 31),
+	kEHCIEDSplitFlags_Port		= EHCIBitRange (23, 29),
+	kEHCIEDSplitFlags_PortPhase	= EHCIBitRangePhase (23, 29),
+	kEHCIEDSplitFlags_HubAddr	= EHCIBitRange (16, 22),
+	kEHCIEDSplitFlags_HubAddrPhase	= EHCIBitRangePhase (16, 22),
+	kEHCIEDSplitFlags_CMask		= EHCIBitRange (8, 15),
+	kEHCIEDSplitFlags_CMaskPhase	= EHCIBitRangePhase (8, 15),
+	kEHCIEDSplitFlags_SMask		= EHCIBitRange (0, 7),
+	kEHCIEDSplitFlags_SMaskPhase	= EHCIBitRangePhase (0, 7),
 
-	kEHCIUniqueNumNoDirMask				= kEHCIEDFlags_EN | kEHCIEDFlags_FA,
+	kUniqueNumNoDirMask		= kEHCIEDFlags_EN | kEHCIEDFlags_FA,
 
 
 	kEHCIEDDirectionTD			= 2,
@@ -333,6 +326,22 @@ enum
 	
 };
 
+enum {
+
+// These are the OHCI codes to map EHCI status to
+	kOHCIITDConditionCRC					= 1,
+	kOHCIITDConditionBitStuffing			= 2,
+	kOHCIITDConditionDataToggleMismatch		= 3,
+	kOHCIITDConditionStall					= 4,
+	kOHCIITDConditionDeviceNotResponding	= 5,
+	kOHCIITDConditionPIDCheckFailure		= 6,
+	kOHCIITDConditionUnExpectedPID			= 7,
+	kOHCIITDConditionDataOverrun			= 8,
+	kOHCIITDConditionDataUnderrun			= 9,
+	kOHCIITDConditionBufferOverrun			= 12,
+	kOHCIITDConditionBufferUnderrun			= 13
+
+};
 
 typedef  UInt8		EHCIEDFormat;			// really only need 1 bit
 
@@ -484,7 +493,40 @@ struct EHCISplitIsochTransferDescriptorShared
 };															// 0x40 length of data structure
 #endif
 
+/* * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * *
+* * * * * *
+ * Configuration Registers
+ *
+ */
+enum 
+{
+	kConfigStart			= 0x00,
+	cwVendorID			= 0x00,			/* 0x1000									*/
+	cwDeviceID			= 0x02,			/* 0x0003									*/
+	cwCommand			= 0x04,
+	cwStatus			= 0x06,
+	clUSBBASE			= 0x10,
+	kConfigEnd			= 0x1000
+};
 
+/*
+ * 0x04 cwCommand					Command Register (read/write)
+ */
+enum 
+{
+	cwCommandSERREnable			= kEHCIBit8,
+	cwCommandEnableParityError	= kEHCIBit6,
+	cwCommandEnableBusMaster	= kEHCIBit2,		// Set this on initialization
+	cwCommandEnableMemorySpace	= kEHCIBit1,		// Respond at Base Address One if set
+	cwCommandEnableIOSpace		= kEHCIBit0			// Respond at Base Address Zero if set
+};
+
+
+// Config space defs.
+enum
+{
+	kEHCIConfigRegBaseAddressRegisterNumber	= 0x10
+};
 
 enum
 {

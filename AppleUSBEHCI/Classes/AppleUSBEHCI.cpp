@@ -25,13 +25,11 @@
 #include <libkern/OSByteOrder.h>
 #include <IOKit/IOMemoryCursor.h>
 #include <IOKit/IOMessage.h>
-#include <IOKit/IOKitKeys.h>
 #include <IOKit/IOFilterInterruptEventSource.h>
 
 #include <IOKit/usb/USB.h>
 #include <IOKit/usb/IOUSBLog.h>
 #include <IOKit/pccard/IOPCCard.h>
-#include <IOKit/usb/IOUSBRootHubDevice.h>
 
 #include "AppleUSBEHCI.h"
 #include "AppleEHCIedMemoryBlock.h"
@@ -54,9 +52,6 @@
 
 OSDefineMetaClassAndStructors(AppleUSBEHCI, IOUSBControllerV2)
 
-// this is a static variable (system wide global)
-AppleEHCIExtraPower		AppleUSBEHCI::_extraPower;						// this is static as currently it is share by all machines
-
 bool 
 AppleUSBEHCI::init(OSDictionary * propTable)
 {
@@ -71,6 +66,8 @@ AppleUSBEHCI::init(OSDictionary * propTable)
     if (!_intLock)
 		goto ErrorExit;
 	
+    _controllerSpeed = kUSBDeviceSpeedHigh;	// This needs to be set before start.
+											// super uses it during start method
     _wdhLock = IOSimpleLockAlloc();
     if (!_wdhLock)
 		goto ErrorExit;
@@ -80,8 +77,6 @@ AppleUSBEHCI::init(OSDictionary * propTable)
 		goto ErrorExit;
 
     _uimInitialized = false;
-    _controllerSpeed = kUSBDeviceSpeedHigh;	// This needs to be set before start.
-											// super uses it during start method
     
     // Initialize our consumer and producer counts.  
     //
@@ -92,12 +87,6 @@ AppleUSBEHCI::init(OSDictionary * propTable)
 	_portDetectInterruptThread = thread_call_allocate((thread_call_func_t)PortDetectInterruptThreadEntry, (thread_call_param_t)this);
 	
 	if ( !_portDetectInterruptThread)
-		goto ErrorExit;
-	
-	// Allocate a thread call to create the root hub
-	_rootHubCreationThread = thread_call_allocate((thread_call_func_t)RootHubCreationEntry, (thread_call_param_t)this);
-	
-	if ( !_rootHubCreationThread)
 		goto ErrorExit;
 	
     return true;
@@ -140,7 +129,7 @@ AppleUSBEHCI::free()
 
 void AppleUSBEHCI::showRegisters(char *s)
 {
-    int i, numPorts;
+    int i;
 	
     USBLog(3,"EHCIUIM -- showRegisters %s version: 0x%x", s, USBToHostWord(_pEHCICapRegisters->HCIVersion));
     USBLog(3,"USBCMD:  %p", (void*)USBToHostLong(_pEHCIRegisters->USBCMD));
@@ -151,8 +140,7 @@ void AppleUSBEHCI::showRegisters(char *s)
     USBLog(3,"PerListBase:  %p", (void*)USBToHostLong(_pEHCIRegisters->PeriodicListBase));
     USBLog(3,"AsyncListAd:  %p", (void*)USBToHostLong(_pEHCIRegisters->AsyncListAddr));
     USBLog(3,"ConfFlg: %p", (void*)USBToHostLong(_pEHCIRegisters->ConfigFlag));
-    numPorts = USBToHostLong(_pEHCICapRegisters->HCSParams) & kEHCINumPortsMask;
-    for(i=0;i<numPorts;i++)
+    for(i=0;i<5;i++)
     {
         UInt32 x;
         x = USBToHostLong(_pEHCIRegisters->PortSC[i]);
@@ -166,7 +154,7 @@ void AppleUSBEHCI::showRegisters(char *s)
 bool
 AppleUSBEHCI::start( IOService * provider )
 {
-   USBLog(7, "AppleUSBEHCI[%p]::start",  this);
+    USBLog(7, "AppleUSBEHCI[%p]::start",  this);
     
     if( !super::start(provider))
         return (false);
@@ -240,11 +228,12 @@ AppleUSBEHCI::UIMInitialize(IOService * provider)
         
         USBLog(7, "AppleUSBEHCI[%p]::UIMInitialize - errata bits=%p",  this,  (void*)_errataBits);
 		
+        _pageSize = PAGE_SIZE;
         _pEHCICapRegisters = (EHCICapRegistersPtr) _deviceBase->getVirtualAddress();
 		
         // enable the card registers
-        lvalue = _device->configRead16(kIOPCIConfigCommand);
-        _device->configWrite16(kIOPCIConfigCommand, lvalue | kIOPCICommandMemorySpace);
+        lvalue = _device->configRead16(cwCommand);
+        _device->configWrite16(cwCommand, lvalue | cwCommandEnableMemorySpace);
 		
         err = AcquireOSOwnership();
         if ( err != kIOReturnSuccess )
@@ -260,8 +249,6 @@ AppleUSBEHCI::UIMInitialize(IOService * provider)
 		else
 			_is64bit = false;
 		
-		setProperty("64bit", _is64bit);
-		
 		ist = (hccparams & kEHCIISTMask) >> kEHCIISTPhase;
 		
 		if (!ist)
@@ -271,34 +258,6 @@ AppleUSBEHCI::UIMInitialize(IOService * provider)
 
 	   	CapLength  = _pEHCICapRegisters->CapLength;
 		_pEHCIRegisters = (EHCIRegistersPtr) ( ((UInt32)_pEHCICapRegisters) + CapLength);
-		
-		// check for extra power
-		if (_extraPower.version == kAppleEHCIExtraPowerVersion)
-		{
-			USBLog(2, "AppleEHCI[%p]::UIMInitilaize - already have extra power structure initialized - aggregate(%d) perPort(%d) inSleep(%d)", this, (int)_extraPower.aggregate, (int)_extraPower.perPort, (int)_extraPower.inSleep);
-		}
-		else
-		{
-			OSNumber		*prop;
-			
-			prop = (OSNumber *)provider->getProperty(kAppleEHCIExtraPowerAggregate);
-			if (prop)
-			{
-				_extraPower.version = kAppleEHCIExtraPowerVersion;
-				_extraPower.aggregate = prop->unsigned32BitValue();
-				prop = (OSNumber *)provider->getProperty(kAppleEHCIExtraPowerPerPort);
-				if (prop)
-					_extraPower.perPort = prop->unsigned32BitValue();
-				prop = (OSNumber *)provider->getProperty(kAppleEHCIExtraPowerInSleep);
-				if (prop)
-					_extraPower.inSleep = prop->unsigned32BitValue();
-				USBLog(2, "AppleEHCI[%p]::UIMInitilaize - extra power structure initialized - aggregate(%d) perPort(%d) inSleep(%d)", this, (int)_extraPower.aggregate, (int)_extraPower.perPort, (int)_extraPower.inSleep);
-			}
-			else
-			{
-				USBLog(7, "AppleEHCI[%p]::UIMInitilaize - no ExtraPower property found!", this);
-			}
-		}
 		
 		// Enable the interrupt delivery.
 		_workLoop->enableAllInterrupts();
@@ -314,7 +273,6 @@ AppleUSBEHCI::UIMInitialize(IOService * provider)
 		
 		for (i=0; (i < 100) && !(USBToHostLong(_pEHCIRegisters->USBSTS) & kEHCIHCHaltedBit); i++)
 			IOSleep(1);
-
 		if (i >= 100)
 		{
             USBError(1, "AppleUSBEHCI[%p]::UIMInitialize - could not get chip to halt within 100 ms",  this);
@@ -338,8 +296,8 @@ AppleUSBEHCI::UIMInitialize(IOService * provider)
         IOSync();
                         
         // enable card bus mastering
-        lvalue = _device->configRead16(kIOPCIConfigCommand);
-         _device->configWrite16(kIOPCIConfigCommand, lvalue  | kIOPCICommandBusMaster | kIOPCICommandMemorySpace);
+        lvalue = _device->configRead16(cwCommand);
+         _device->configWrite16(cwCommand, lvalue  | cwCommandEnableBusMaster | cwCommandEnableMemorySpace);
 
 		// turn on transaction completion/error interrupts
 		_pEHCIRegisters->USBIntr = HostToUSBLong(kEHCICompleteIntBit | kEHCIErrorIntBit | kEHCIHostErrorIntBit | kEHCIFrListRolloverIntBit);
@@ -469,85 +427,26 @@ AppleUSBEHCI::AsyncInitialize (void)
 IOReturn 
 AppleUSBEHCI::InterruptInitialize (void)
 {
-    int								i;
-    UInt32							termBit, *list; 
-    IOUSBControllerListElement		**logical;
-    IOPhysicalAddress				physPtr;
-	IOReturn						status;
-	UInt64							offset = 0;
-	IODMACommand::Segment32			segments;
-	UInt32							numSegments = 1;
-	IODMACommand					*dmaCommand = NULL;
+    int 			i;
+    UInt32 			termBit, *list; 
+    IOUSBControllerListElement	**logical;
+    IOPhysicalAddress 		physPtr;
 	
-    // Set up periodic list
-	_periodicListBuffer = IOBufferMemoryDescriptor::inTaskWithPhysicalMask(kernel_task, kIOMemoryUnshared | kIODirectionInOut, kEHCIPeriodicFrameListsize, kEHCIStructureAllocationPhysicalMask);
-    if (_periodicListBuffer == NULL) 
-	{
-		USBError(1, "AppleUSBEHCI[%p]::InterruptInitialize - IOBufferMemoryDescriptor::inTaskWithPhysicalMask failed", this);
-        return kIOReturnNoMemory;
+    _periodicList = (UInt32 *)IOMallocContiguous(kEHCIPeriodicFrameListsize, kEHCIPageSize, &physPtr);
+	
+    if(_periodicList == NULL)
+    {
+		return kIOReturnNoResources;
     }
-    status = _periodicListBuffer->prepare();
-	if (status)
-	{
-		USBError(1, "AppleUSBEHCI[%p]::InterruptInitialize - could not prepare buffer err(%p)", this, (void*)status);
-		_periodicListBuffer->release();
-		_periodicListBuffer = NULL;
-        return status;
-	}
-
-	_periodicList = (UInt32 *)_periodicListBuffer->getBytesNoCopy();
 	
-	// Use IODMACommand to get the physical address
-	dmaCommand = IODMACommand::withSpecification(kIODMACommandOutputHost32, 32, PAGE_SIZE, (IODMACommand::MappingOptions)(IODMACommand::kMapped | IODMACommand::kIterateOnly));
-	if (!dmaCommand)
-	{
-		USBError(1, "AppleUSBEHCI[%p]::InterruptInitialize - could not get IODMACommand", this);
-		_periodicListBuffer->complete();
-		_periodicListBuffer->release();
-		_periodicListBuffer = NULL;
-        return kIOReturnNoMemory;
-	}
-
-	USBLog(6, "AppleUSBEHCI[%p]::InterruptInitialize - got IODMACommand %p", this, dmaCommand);
-	status = dmaCommand->setMemoryDescriptor(_periodicListBuffer);
-	if (status)
-	{
-		USBError(1, "AppleUSBEHCI[%p]::InterruptInitialize - setMemoryDescriptor returned err (%p)", this, (void*)status);
-		dmaCommand->release();
-		_periodicListBuffer->complete();
-		_periodicListBuffer->release();
-		_periodicListBuffer = NULL;
-        return status;
-	}
-	
-	status = dmaCommand->gen32IOVMSegments(&offset, &segments, &numSegments);
-	if (status || (numSegments != 1) || (segments.fLength != PAGE_SIZE))
-	{
-		USBError(1, "AppleUSBEHCI[%p]::InterruptInitialize - could not generate segments err (%p) numSegments (%d) fLength (%d)", this, (void*)status, (int)numSegments, (int)segments.fLength);
-		status = status ? status : kIOReturnInternalError;
-		dmaCommand->clearMemoryDescriptor();
-		dmaCommand->release();
-		_periodicListBuffer->complete();
-		_periodicListBuffer->release();
-		_periodicListBuffer = NULL;
-        return status;
-	}
-	
-	physPtr = segments.fIOVMAddr;
-
-	USBLog(7, "AppleUSBEHCI[%p]::InterruptInitialize - frame list pPhysical[%p] frames[%p]", this, (void*)physPtr, _periodicList);
-
     _pEHCIRegisters->PeriodicListBase = HostToUSBLong(physPtr);
-	dmaCommand->clearMemoryDescriptor();
-	dmaCommand->release();
 	
     _logicalPeriodicList = (IOUSBControllerListElement **)IOMalloc(kEHCIPeriodicFrameListsize);
     if(_logicalPeriodicList == NULL)
     {
-		_periodicListBuffer->complete();
-		_periodicListBuffer->release();
-		_periodicListBuffer = NULL;
-		return kIOReturnNoMemory;
+		IOFreeContiguous(_periodicList, kEHCIPeriodicFrameListsize);
+        _periodicList = NULL;
+		return kIOReturnNoResources;
     }
 	
 	
@@ -577,14 +476,10 @@ AppleUSBEHCI::UIMFinalize(void)
     if ( _deviceBase )
         USBLog (3, "AppleUSBEHCI[%p]: @ %lx (%lx)(shutting down HW)", this, (long)_deviceBase->getVirtualAddress(), _deviceBase->getPhysicalAddress());
     
-#if 0
-	// 4930013: JRH - This is a bad thing to do with shared interrupts, and since we turn off interrupts at the source
-	// it should be redundant. Let's stop doing it..
-	// Disable the interrupt delivery
+    // Disable the interrupt delivery
     //
     if ( _workLoop )
         _workLoop->disableAllInterrupts();
-#endif
 	
     // Wait for the interrupts to propagate
     //
@@ -655,7 +550,7 @@ AppleUSBEHCI::UIMFinalize(void)
 
         // Take away the controllers ability be a bus master.
         //
-        _device->configWrite32(kIOPCIConfigCommand, kIOPCICommandMemorySpace);
+        _device->configWrite32(cwCommand, cwCommandEnableMemorySpace);
 		
         _pEHCIRegisters->PeriodicListBase = 0;		// no periodic list as yet
 		_pEHCIRegisters->AsyncListAddr = 0;			// no async list as yet
@@ -665,11 +560,10 @@ AppleUSBEHCI::UIMFinalize(void)
 	
     // Free the memory allocated in the InterruptInitialize()
     //
-    if ( _periodicListBuffer )
+    if ( _periodicList )
 	{
-		_periodicListBuffer->complete();
-		_periodicListBuffer->release();
-		_periodicListBuffer = NULL;
+        IOFreeContiguous( _periodicList, kEHCIPeriodicFrameListsize );
+		_periodicList = NULL;
 	}
 	
     if ( _logicalPeriodicList )
@@ -717,7 +611,7 @@ AppleUSBEHCI::GetFrameNumber32()
 	// If the controller is halted, then we should just bail out
 	if ( USBToHostLong(_pEHCIRegisters->USBSTS) & kEHCIHCHaltedBit)
 	{
-		USBLog(1, "AppleUSBEHCI[%p]::GetFrameNumber32 called but controller is halted",  this);
+		USBLog(6, "AppleUSBEHCI[%p]::GetFrameNumber32 called but controller is halted",  this);
 		return 0;
 	}
 	
@@ -751,7 +645,7 @@ AppleUSBEHCI::GetFrameNumber()
 	// If the controller is halted, then we should just bail out
 	if ( USBToHostLong(_pEHCIRegisters->USBSTS) & kEHCIHCHaltedBit)
 	{
-		USBLog(1, "AppleUSBEHCI[%p]::GetFrameNumber called but controller is halted",  this);
+		USBLog(6, "AppleUSBEHCI[%p]::GetFrameNumber called but controller is halted",  this);
 		return 0;
 	}
 	
@@ -1031,11 +925,6 @@ AppleUSBEHCI::AllocateITD(void)
         if (!_pFreeITD)
             _pLastFreeITD = NULL;
     }
-	
-	// initialize the page pointers to zero length
-	//
-    bzero(&freeITD->GetSharedLogical()->Transaction0, sizeof(EHCIIsochTransferDescriptorShared)-sizeof(IOPhysicalAddress) );
-
     USBLog(7, "AppleUSBEHCI[%p]::AllocateITD - returning %p",  this, freeITD);
     return freeITD;
 }
@@ -1181,8 +1070,8 @@ AppleUSBEHCI::UIMInitializeForPowerUp(void)
     do {
 		
         // enable the card registers
-        lvalue = _device->configRead16(kIOPCIConfigCommand);
-        _device->configWrite16(kIOPCIConfigCommand, lvalue | kIOPCICommandMemorySpace);
+        lvalue = _device->configRead16(cwCommand);
+        _device->configWrite16(cwCommand, lvalue | cwCommandEnableMemorySpace);
 		
         CapLength  = _pEHCICapRegisters->CapLength;
         _pEHCIRegisters = (EHCIRegistersPtr) ( ((UInt32)_pEHCICapRegisters) + CapLength);
@@ -1238,8 +1127,8 @@ AppleUSBEHCI::UIMInitializeForPowerUp(void)
 		}
 		
         // enable card bus mastering
-        lvalue = _device->configRead16(kIOPCIConfigCommand);
-        _device->configWrite16(kIOPCIConfigCommand, lvalue | (kIOPCICommandBusMaster | kIOPCICommandMemorySpace));
+        lvalue = _device->configRead16(cwCommand);
+        _device->configWrite16(cwCommand, lvalue | (cwCommandEnableBusMaster | cwCommandEnableMemorySpace));
 		
         // turn on transaction completion/error interrupts
         //
@@ -1329,20 +1218,16 @@ AppleUSBEHCI::UIMFinalizeForPowerDown(void)
 {
     int 	i;
     IOReturn	err;
-
+	
     if ( _deviceBase )
         USBLog (3, "AppleUSBEHCI[%p]: @ %lx (%lx)(turning off HW)", this, (long)_deviceBase->getVirtualAddress(), _deviceBase->getPhysicalAddress());
     
     // showRegisters("Before");
     
-#if 0
-	// 4930013: JRH - This is a bad thing to do with shared interrupts, and since we turn off interrupts at the source
-	// it should be redundant. Let's stop doing it..
     // Disable the interrupt delivery
     //
     if ( _workLoop )
         _workLoop->disableAllInterrupts();
-#endif
 	
     // Wait for the interrupts to propagate
     //
@@ -1350,16 +1235,16 @@ AppleUSBEHCI::UIMFinalizeForPowerDown(void)
 	
     if ( _pEHCIRegisters && _device )
     {
-        // We need to disable all interrupts, stop all list processing, and halt the controller.  We do NOT need
-		// to reset the controller, as we want to keep the ownership bit set to the EHCI controller (rdar://5083325)
+        // If we are NOT being terminated, then talk to the OHCI controller and
+        // set up all the registers to be off
         //
         // Disable All EHCI Interrupts
         //
         _pEHCIRegisters->USBIntr = 0x0;
         IOSync();
 		
-        // This stops all list processing AND sets the run/stop bit to stop.  It does NOT reset the HC
-        _pEHCIRegisters->USBCMD = 0; 
+        // reset the chip and make sure that all is well
+        _pEHCIRegisters->USBCMD = 0;  			// this sets r/s to stop
         for (i=0; (i < 100) && !(USBToHostLong(_pEHCIRegisters->USBSTS) & kEHCIHCHaltedBit); i++)
             IOSleep(1);
         if (i >= 100)
@@ -1370,9 +1255,36 @@ AppleUSBEHCI::UIMFinalizeForPowerDown(void)
         }
 		_ehciBusState = kEHCIBusStateOff;
 		
+        _pEHCIRegisters->USBCMD = HostToUSBLong(kEHCICMDHCReset);		// set the reset bit
+        for (i=0; (i < 100) && (USBToHostLong(_pEHCIRegisters->USBCMD) & kEHCICMDHCReset); i++)
+            IOSleep(1);
+        if (i >= 100)
+        {
+            USBError(1, "AppleUSBEHCI[%p]::UIMInitializeForPowerUp - could not get chip to come out of reset within 100 ms",  this);
+            err = kIOReturnInternalError;
+            goto ErrorExit;
+        }
+        
+        // Route ports back to companion controller
+        _pEHCIRegisters->ConfigFlag = 0;
+        IOSync();
+		IOSleep(1);
+		if (_errataBits & kErrataNECIncompleteWrite)
+		{
+			UInt32		newValue = 0, count = 0;
+			newValue = USBToHostLong(_pEHCIRegisters->ConfigFlag);
+			while ((count++ < 10) && (newValue != 0))
+			{
+				USBError(1, "EHCI driver: UIMFinalizeForPowerDown - ConfigFlag bit not sticking. Retrying.");
+				_pEHCIRegisters->ConfigFlag = 0;
+				IOSync();
+				newValue = USBToHostLong(_pEHCIRegisters->ConfigFlag);
+			}
+		}
+		
 		// Take away the controllers ability be a bus master.
         //
-        _device->configWrite16(kIOPCIConfigCommand, kIOPCICommandMemorySpace);
+        _device->configWrite16(cwCommand, cwCommandEnableMemorySpace);
 		
         _pEHCIRegisters->PeriodicListBase = 0;	// no periodic list as yet
 		_pEHCIRegisters->AsyncListAddr = 0;		// no async list as yet
@@ -1607,86 +1519,25 @@ AppleUSBEHCI::DisablePeriodicSchedule(bool waitForOFF)
 IOReturn
 AppleUSBEHCI::message( UInt32 type, IOService * provider,  void * argument )
 {
+    cs_event_t	pccardevent;
 	
-    USBLog(6, "AppleUSBEHCI[%p]::message type: %p, isInactive = %d",  this, (void*)type, isInactive());
-
-	switch (type)
-	{
-		case kIOUSBMessageExpressCardCantWake:
-			IOService *					nub = (IOService*)argument;
-			const IORegistryPlane *		usbPlane = getPlane(kIOUSBPlane);
-			IOUSBRootHubDevice *		parentHub = OSDynamicCast(IOUSBRootHubDevice, nub->getParentEntry(usbPlane));
-
-			nub->retain();
-			USBLog(1, "AppleUSBUHCI[%p]::message - got kIOUSBMessageExpressCardCantWake from driver %s[%p] argument is %s[%p]", this, provider->getName(), provider, nub->getName(), nub);
-			if (parentHub == _rootHubDevice)
-			{
-				USBLog(1, "AppleUSBUHCI[%p]::message - device is attached to my root hub!!", this);
-				_badExpressCardAttached = true;
-			}
-			nub->release();
-			return kIOReturnSuccess;  // this message was handled
-			break;
-			
-		case kIOPCCardCSEventMessage:
-			cs_event_t	pccardevent;
-			pccardevent = (UInt32) argument;
-			
-			if ( pccardevent == CS_EVENT_CARD_REMOVAL )
-			{
-				// Should return all transactions in any endpoints
-				//
-				USBLog(5,"AppleUSBEHCI[%p]: Received kIOPCCardCSEventMessage Need to return all transactions",this);
-				_pcCardEjected = true;
-			}
-			// let the super-class run as well...
-			break;
-
-		case kIOUSBMessageRequestExtraPower:
-			AppleRootHubExtraPowerRequest		*extraPowerRequest = (AppleRootHubExtraPowerRequest*)argument;
-			
-			if (_extraPower.version != kAppleEHCIExtraPowerVersion)
-				return kIOReturnNoResources;				
-			
-			// 0 - that seems silly
-			if (!extraPowerRequest->requestedExtraPower)
-			{
-				USBLog(7, "AppleUSBEHCI[%p]::message(kIOUSBMessageRequestExtraPower) - no extra power requested - fine with me", this);
-				extraPowerRequest->extraPowerAvailable = 0;
-				return kIOReturnSuccess;
-			}
-			
-			// < 0 -- returning power
-			if (extraPowerRequest->requestedExtraPower < 0)
-			{
-				// someone is giving the extra power back
-				_extraPower.aggregate = _extraPower.aggregate - extraPowerRequest->requestedExtraPower;
-				extraPowerRequest->extraPowerAvailable = 0;
-				USBLog(2, "AppleUSBEHCI[%p]::message(kIOUSBMessageRequestExtraPower) - requested(%d) - aggregate now at (%d)", this, (int)extraPowerRequest->requestedExtraPower, (int)_extraPower.aggregate);
-				return kIOReturnSuccess;
-			}
-			
-			// requesting new power
-			
-			// check to make sure there is enough aggregate
-			if ((UInt32)extraPowerRequest->requestedExtraPower > _extraPower.aggregate)
-				return kIOReturnNoResources;
-				
-			// now check to make sure there is enough on each port
-			if ((UInt32)extraPowerRequest->requestedExtraPower > _extraPower.perPort)
-				return kIOReturnNoResources;
-
-			extraPowerRequest->extraPowerAvailable = extraPowerRequest->requestedExtraPower;
-			_extraPower.aggregate = _extraPower.aggregate - extraPowerRequest->requestedExtraPower;
-			USBLog(2, "AppleUSBEHCI[%p]::message(kIOUSBMessageRequestExtraPower) - requested(%d) - aggregate now at (%d)", this, (int)extraPowerRequest->requestedExtraPower, (int)_extraPower.aggregate);
-			return kIOReturnSuccess;
-			break;
-	}
-	
-
     // Let our superclass decide handle this method
     // messages
     //
+    if ( type == kIOPCCardCSEventMessage)
+    {
+        pccardevent = (UInt32) argument;
+		
+        if ( pccardevent == CS_EVENT_CARD_REMOVAL )
+        {
+            // Should return all transactions in any endpoints
+            //
+            USBLog(5,"AppleUSBEHCI[%p]: Received kIOPCCardCSEventMessage Need to return all transactions",this);
+            _pcCardEjected = true;
+        }
+    }
+	
+    USBLog(6, "AppleUSBEHCI[%p]::message type: %p, isInactive = %d",  this, (void*)type, isInactive());
     return super::message( type, provider, argument );
 	
 }
@@ -1715,15 +1566,6 @@ void
 AppleUSBEHCI::ReturnIsochDoneQueue(IOUSBControllerIsochEndpoint* isochEP)
 {
 	super::ReturnIsochDoneQueue(isochEP);
-}
-
-
-
-IODMACommand*
-AppleUSBEHCI::GetNewDMACommand()
-{
-	USBLog(7, "AppleUSBEHCI[%p]::GetNewDMACommand - creating %d bit IODMACommand", this, _is64bit ? 64 : 32);
-	return IODMACommand::withSpecification(kIODMACommandOutputHost64, _is64bit ? 64 : 32, 0);
 }
 
 

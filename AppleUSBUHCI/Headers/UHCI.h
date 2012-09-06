@@ -238,7 +238,6 @@ enum
 #define kUHCIPageMask 		(~(kUHCIPageOffsetMask))	// mask off just the page number (high 20)
 #define kUHCIPtrMask		( 0xFFFFFFF0 )				// mask for list element pointers
 
-#define	kUHCIStructureAllocationPhysicalMask	0x00000000FFFFF000ULL			// for use with inTaskWithPhysicalMask (below 4GB and 4K aligned)
 
 #endif /*  _IOKIT_UHCI_H_ */
 

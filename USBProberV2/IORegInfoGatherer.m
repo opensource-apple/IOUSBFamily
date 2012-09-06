@@ -36,7 +36,7 @@ void scanUSBDevices(io_iterator_t intfIterator, OutlineViewNode * rootNode, char
 
 static void DeviceAdded(void *refCon, io_iterator_t iterator)
 {
-    io_service_t ioDeviceObj = IO_OBJECT_NULL;
+    io_service_t ioDeviceObj=nil;
     
     while( ioDeviceObj = IOIteratorNext( iterator) )
     {
@@ -47,7 +47,7 @@ static void DeviceAdded(void *refCon, io_iterator_t iterator)
 
 static void DeviceRemoved(void *refCon, io_iterator_t iterator)
 {
-    io_service_t ioDeviceObj = IO_OBJECT_NULL;
+    io_service_t ioDeviceObj=nil;
     
     while( (ioDeviceObj = IOIteratorNext( iterator)))
     {
@@ -233,30 +233,6 @@ void show(io_registry_entry_t service, UInt32 serviceDepth, UInt64 stackOfBits, 
     kern_return_t   status     = KERN_SUCCESS;
     io_name_t       location;       // (don't release)
     static char	buf[350], tempbuf[350];
-	CFNumberRef		address;
-	
-	
- 	address = IORegistryEntryCreateCFProperty(service, CFSTR("USB Address"), kCFAllocatorDefault, kNilOptions);
-	if (address)  
-	{
-		UInt32	addr = 0;
-		CFNumberGetValue((CFNumberRef)address, kCFNumberLongType, &addr);
-        sprintf((char *)tempbuf, "%ld: ", addr);
-        strcat(buf,tempbuf); 
-		CFRelease(address);
-		address = NULL;
-    }
-	
- 	address = IORegistryEntryCreateCFProperty(service, CFSTR("USBBusNumber"), kCFAllocatorDefault, kNilOptions);
-	if (address)  
-	{
-		UInt32	addr = 0;
-		CFNumberGetValue((CFNumberRef)address, kCFNumberLongType, &addr);
-        sprintf((char *)tempbuf, "0x%lx: ", addr);
-        strcat(buf,tempbuf); 
-		CFRelease(address);
-		address = NULL;
-    }
 	
     status = IORegistryEntryGetNameInPlane(service, plane, name);
     
@@ -277,7 +253,7 @@ void show(io_registry_entry_t service, UInt32 serviceDepth, UInt64 stackOfBits, 
 	
     //[rootNode addNodeWithName:"" value:buf atDepth:serviceDepth];
     // IOObjectRetain(service);
-    IORegOutlineViewNode *aNode  =  [[IORegOutlineViewNode alloc] initWithName:@"" value:[NSString stringWithCString:buf encoding:NSUTF8StringEncoding]];
+    IORegOutlineViewNode *aNode  =  [[IORegOutlineViewNode alloc] initWithName:@"" value:[NSString stringWithCString:buf]];
     [rootNode addNode:aNode atDepth:serviceDepth];
     [aNode setRepresentedDevice:service];
     [aNode release];

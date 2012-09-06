@@ -50,6 +50,8 @@ enum {
 // USB bus has two power states, off and on
 #define number_of_power_states 2
 
+#define kAppleCurrentAvailable	"AAPL,current-available"
+
 // Note: This defines two states. off and on. In the off state, the bus is suspended. We
 // really should have three state, off (reset), suspended (suspend), and on (operational)
 //
@@ -433,9 +435,9 @@ AppleUSBOHCI::setPowerState( unsigned long powerStateOrdinal, IOService* whatDev
 				UIMFinalizeForPowerDown();
 				_ohciAvailable = false;					// tell the interrupt filter routine that we are off
 
-				IOSleep(50);				// this appears to the devices as a reset, so wait the required 50 ms
-				USBLog(3,"AppleUSBOHCI[%p]::setPowerState - Would create root hub here, postponing it!", this);
-				thread_call_enter(_rootHubCreationThread);
+				USBLog(3,"AppleUSBOHCI[%p]::setPowerState - Would create root hub here, postponing it! (%d)", this, _needToCreateRootHub);
+				_needToCreateRootHub = TRUE;
+				
 			}
 		}
 

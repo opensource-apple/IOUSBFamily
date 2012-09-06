@@ -2,7 +2,7 @@
  *
  * @APPLE_LICENSE_HEADER_START@
  * 
- * Copyright (c) 1998-2007 Apple Inc.  All Rights Reserved.
+ * Copyright (c) 1998-2003 Apple Computer, Inc.  All Rights Reserved.
  * 
  * This file contains Original Code and/or Modifications of Original Code
  * as defined in and that are subject to the Apple Public Source License
@@ -224,7 +224,6 @@ AppleEHCIIsochTransferDescriptor::UpdateFrameList(AbsoluteTime timeStamp)
     int								i,j;
 	UInt16							*pActCount;
 	UInt8							framesInTD;
-	UInt32							hsInterval;
 	
     ret = _pEndpoint->accumulatedStatus;
 	
@@ -235,18 +234,17 @@ AppleEHCIIsochTransferDescriptor::UpdateFrameList(AbsoluteTime timeStamp)
 		return kIOReturnSuccess;
 	
     pLLFrames = (IOUSBLowLatencyIsocFrame*)_pFrames;
-	hsInterval = (1 << (_pEndpoint->interval - 1));
-    for(i=0, j=0; i < 8; i+= hsInterval, j++)
+    for(i=0, j=0; i < 8; i+= _pEndpoint->interval, j++)
     {
 		if (!framesInTD)
 			break;
 		
-	    statusWord = USBToHostLong(TransactionP[i]);
-
+	    statusWord = USBToHostLong(*(TransactionP++));
 		if (_lowLatency)
 			pActCount = &(pLLFrames[_frameIndex + j].frActCount);
 		else
 			pActCount = &(pFrames[_frameIndex + j].frActCount);
+		
 	    frStatus = mungeEHCIStatus(statusWord, pActCount,  _pEndpoint->maxPacketSize,  _pEndpoint->direction);
 
 	    if(frStatus != kIOReturnSuccess)
@@ -386,7 +384,7 @@ AppleEHCISplitIsochTransferDescriptor::UpdateFrameList(AbsoluteTime timeStamp)
     // warning - this method can run at primary interrupt time, which can cause a panic if it logs too much
     // USBLog(7, "AppleEHCISplitIsochTransferDescriptor[%p]::UpdateFrameList statFlags (%x)", this, statFlags);
     pFrames = _pFrames;
-	if (!pFrames || _isDummySITD)							// this will be the case for the dummy TD
+	if (!pFrames)							// this will be the case for the dummy TD
 		return kIOReturnSuccess;
 	
     pLLFrames = (IOUSBLowLatencyIsocFrame*)_pFrames;

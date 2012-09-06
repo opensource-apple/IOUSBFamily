@@ -22,7 +22,6 @@
 
 
 #include <IOKit/usb/IOUSBLog.h> 
-#include <IOKit/usb/IOUSBRootHubDevice.h>
 
 #include "AppleUSBUHCI.h"
 
@@ -493,7 +492,7 @@ AppleUSBUHCI::UIMRootHubStatusChange(bool abort)
     UInt8								bitmap, bit;
     unsigned int						i, index, move;
     IOUSBHubPortStatus					portStatus;
-    struct UHCIRHInterruptTransaction	last;
+    struct InterruptTransaction			last;
     
     USBLog(5, "%s[%p]::UIMRootHubStatusChange (Abort: %d, _uhciAvailable: %d)", getName(), this, abort, _uhciAvailable);
         
@@ -561,7 +560,7 @@ AppleUSBUHCI::UIMRootHubStatusChange(bool abort)
 				
 				if ( !_previousPortRecoveryAttempted[i-1] )
 				{
-					USBLog(7, "AppleUSBUHCI[%p]::UIMRootHubStatusChange  Port %d had a change: 0x%x", this, i, portStatus.changeFlags);
+					USBLog(2, "AppleUSBUHCI[%p]::UIMRootHubStatusChange  Port %d had a change: 0x%x", this, i, portStatus.changeFlags);
 					if ( (portStatus.changeFlags & kHubPortEnabled) and (portStatus.statusFlags & kHubPortConnection) and (portStatus.statusFlags & kHubPortPower) and !(portStatus.statusFlags & kHubPortEnabled) )
 					{
 						// Indicate that we are attempting a recovery
@@ -598,7 +597,7 @@ AppleUSBUHCI::UIMRootHubStatusChange(bool abort)
 	}
 	else
 	{
-		USBLog(7, "AppleUSBUHCI[%p]::UIMRootHubStatusChange - no work to (abort: %d, available: %d)", this, abort, _uhciAvailable);
+		USBLog(3, "AppleUSBUHCI[%p]::UIMRootHubStatusChange - no work to (abort: %d, available: %d)", this, _uhciAvailable, _uhciAvailable);
 	}
     
     // Bitmap is only one byte, so it doesn't need swapping.
@@ -866,7 +865,6 @@ AppleUSBUHCI::RHCreateInterruptTransfer(IOUSBCommand* command)
             _outstandingTrans[index].bufLen = command->GetReqCount();
             _outstandingTrans[index].completion = command->GetUSLCompletion();
             IOUnlock(_intLock);									// Unlock the queue
-
 			// Calculate how long it's been since the last status change and wait until the pollingRate to call the UIMRootHubStatusChange()
 			lastRootHubChangeTime = RHLastPortStatusChanged();
 			
@@ -877,7 +875,7 @@ AppleUSBUHCI::RHCreateInterruptTransfer(IOUSBCommand* command)
 			
 			if ( elapsedTime < kUHCIRootHubPollingInterval )
 			{
-				USBLog(5, "AppleUSBUHCI[%p]::SimulateRootHubInt  Last change was %qd ms ago.  IOSleep'ing for %qd ms, _workLoop->inGate = %d",  this, elapsedTime, kUHCIRootHubPollingInterval - elapsedTime, _workLoop->inGate() );
+				USBLog(5, "AppleUSBUHCI[%p]::SimulateRootHubInt  Last change was %qd ms ago.  IOSleep'ing for %qd ms",  this, elapsedTime, kUHCIRootHubPollingInterval - elapsedTime );
 				IOSleep( kUHCIRootHubPollingInterval - elapsedTime );
 			}
 			
@@ -1135,21 +1133,6 @@ AppleUSBUHCI::RHResetPort(int port)
     return kIOReturnSuccess;
 }
 
-// Reset and enable the port
-IOReturn
-AppleUSBUHCI::RHHoldPortReset(int port)
-{
-    UInt16 value;
-    int i;
-    
-    USBLog(1, "%s[%p]::RHHoldPortReset %d", getName(), this, port);
-    port--; // convert 1-based to 0-based.
-
-    value = ReadPortStatus(port) & kUHCI_PORTSC_MASK;
-    WritePortStatus(port, value | kUHCI_PORTSC_RESET);
-    
-    return kIOReturnSuccess;
-}
 
 
 /* ==== debugging ==== */
@@ -1237,62 +1220,3 @@ AppleUSBUHCI::RHDumpHubPortStatus(IOUSBHubPortStatus *status)
     
 }
 
-
-
-void
-AppleUSBUHCI::RootHubCreationEntry(OSObject *target)
-{
-    AppleUSBUHCI *			me = OSDynamicCast(AppleUSBUHCI, target);
-	
-    if (!me )
-        return;
-	
-    me->retain();
-    me->RootHubCreation();
-    me->release();
-}
-
-
-
-void
-AppleUSBUHCI::RootHubCreation()
-{
-	USBLog(2,"AppleUSBUHCI[%p]::RootHubCreation - Need to recreate root hub on bus %ld INTR[%p] _uhciBusState[%d] _uhciAvailable[%s]", this, _busNumber, (void*)ioRead16(kUHCI_INTR), _uhciBusState, _uhciAvailable ? "true" : "false");
-	
-	if (_ehciController)
-		_ehciController->SynchronizeCompanionRootHub(this);
-	else
-	{
-		USBLog(2,"AppleUSBUHCI[%p]::RootHubCreation - no EHCI controller", this);
-	}
-	
-	USBLog(2,"AppleUSBUHCI[%p]::RootHubCreation -  Need to recreate root hub on bus %ld, powering up hardware", this, _busNumber);
-	
-	// Initialize our hardware
-	//
-	UIMInitializeForPowerUp();
-	_uhciAvailable = true;										// tell the interrupt filter routine that we are on
-	Run(true);
-	_uhciBusState = kUHCIBusStateRunning;
-	_wakingFromHibernation = false;
-	
-	IOSleep(20);												// wait 20 ms after power on before we actually create the root hub
-
-	if ( _rootHubDevice == NULL )
-	{
-		IOReturn err;
-		
-		err = CreateRootHubDevice( _device, &_rootHubDevice );
-		if ( err != kIOReturnSuccess )
-		{
-			USBError(1,"AppleUSBUHCI[%p]::RootHubCreation -  Could not create root hub device upon wakeup (%x)!", this, err);
-		}
-		else
-		{
-			USBLog(2,"AppleUSBUHCI[%p]::RootHubCreation -  calling registerService on new root hub", this);
-			_rootHubDevice->registerService(kIOServiceRequired | kIOServiceSynchronous);
-		}
-	}
-	USBLog(2,"AppleUSBUHCI[%p]::RootHubCreation - done creating root hub on bus %ld INTR[%p] _uhciBusState[%d] _uhciAvailable[%s]", this, _busNumber, (void*)ioRead16(kUHCI_INTR), _uhciBusState, _uhciAvailable ? "true" : "false");
-	return;				// nothing else to do if we are just creating the root hub
-}

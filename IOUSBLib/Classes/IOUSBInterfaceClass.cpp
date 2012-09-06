@@ -112,7 +112,7 @@ IOUSBInterfaceClass::~IOUSBInterfaceClass()
 			IOObjectRelease(fDevice);
         fDevice = MACH_PORT_NULL;
     }
-	
+
 	if ( fAsyncPort)
 		mach_port_destroy( mach_task_self(), fAsyncPort);
 
@@ -320,9 +320,9 @@ IOUSBInterfaceClass::GetPropertyInfo(void)
     //
     kr = IORegistryEntryCreateCFProperties(fDevice, &entryProperties, NULL, 0);
 	if (kr)
-        return kr;
+		return kr;
 	
-	if ( entryProperties )
+    if ( entryProperties )
     {
         CFTypeRef val;
 		
@@ -2002,7 +2002,7 @@ IOUSBInterfaceClass::CacheConfigDescriptor()
         request.bRequest = kUSBRqGetDescriptor;
         request.wValue = (kUSBConfDesc << 8) + i;
         request.wIndex = 0;
-		request.wLength = sizeof(IOUSBConfigurationDescHeader);
+        request.wLength = sizeof(IOUSBConfigurationDescHeader);
         request.pData = &configHdr;
         
         err = ControlRequest(0, &request);
@@ -2031,7 +2031,7 @@ IOUSBInterfaceClass::CacheConfigDescriptor()
 		}
 		else
 		{
-			size = USBToHostWord(configHdr.wTotalLength);
+        size = USBToHostWord(configHdr.wTotalLength);
 		}
         fConfigLength = size+2;
         fConfigPtr = (IOUSBConfigurationDescriptorPtr) malloc(size+2);
