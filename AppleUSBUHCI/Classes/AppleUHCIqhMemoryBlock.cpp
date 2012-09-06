@@ -1,5 +1,4 @@
 /*
- * Copyright (c) 2003 Apple Computer, Inc. All rights reserved.
  *
  * @APPLE_LICENSE_HEADER_START@
  * 
@@ -23,35 +22,39 @@
  * @APPLE_LICENSE_HEADER_END@
  */
 
+#include <IOKit/IOBufferMemoryDescriptor.h>
 #include <IOKit/usb/IOUSBLog.h>
 
-#include "AppleEHCIedMemoryBlock.h"
+#include "AppleUSBUHCI.h"
+#include "UHCI.h"
+#include "AppleUHCIqhMemoryBlock.h"
 
 #define super IOBufferMemoryDescriptor
-OSDefineMetaClassAndStructors(AppleEHCIedMemoryBlock, IOBufferMemoryDescriptor);
 
-AppleEHCIedMemoryBlock*
-AppleEHCIedMemoryBlock::NewMemoryBlock(void)
+OSDefineMetaClassAndStructors(AppleUHCIqhMemoryBlock, IOBufferMemoryDescriptor);
+
+AppleUHCIqhMemoryBlock*
+AppleUHCIqhMemoryBlock::NewMemoryBlock(void)
 {
-    AppleEHCIedMemoryBlock 		*me = new AppleEHCIedMemoryBlock;
-    IOByteCount				len;
+    AppleUHCIqhMemoryBlock 		*me = new AppleUHCIqhMemoryBlock;
+    IOByteCount					len;
     
     if (!me)
-		USBError(1, "AppleEHCIedMemoryBlock::NewMemoryBlock, constructor failed!");
+		USBError(1, "AppleUHCIqhMemoryBlock::NewMemoryBlock, constructor failed!");
 	
     // allocate exactly one physical page
-    if (me && !me->initWithOptions(kIOMemorySharingTypeMask, kEHCIPageSize, kEHCIPageSize)) 
+    if (me && !me->initWithOptions(kIOMemorySharingTypeMask, kUHCIPageSize, kUHCIPageSize)) 
     {
-		USBError(1, "AppleEHCIedMemoryBlock::NewMemoryBlock, initWithOptions failed!");
+		USBError(1, "AppleUHCIqhMemoryBlock::NewMemoryBlock, initWithOptions failed!");
 		me->release();
 		return NULL;
     }
     
-    USBLog(7, "AppleEHCIedMemoryBlock::NewMemoryBlock, sizeof (me) = %d, sizeof (super) = %d", (int)sizeof(AppleEHCIedMemoryBlock), (int)sizeof(super)); 
+    USBLog(7, "AppleUHCIqhMemoryBlock::NewMemoryBlock, sizeof (me) = %ld, sizeof (super) = %ld", sizeof(AppleUHCIqhMemoryBlock), sizeof(super)); 
     
     me->prepare();
-    me->_sharedLogical = (EHCIQueueHeadSharedPtr)me->getBytesNoCopy();
-    bzero(me->_sharedLogical, kEHCIPageSize);
+    me->_sharedLogical = (UHCIQueueHeadSharedPtr)me->getBytesNoCopy();
+    bzero(me->_sharedLogical, kUHCIPageSize);
     me->_sharedPhysical = me->getPhysicalSegment(0, &len);
     
     return me;
@@ -60,35 +63,34 @@ AppleEHCIedMemoryBlock::NewMemoryBlock(void)
 
 
 UInt32
-AppleEHCIedMemoryBlock::NumEDs(void)
+AppleUHCIqhMemoryBlock::NumQHs(void)
 {
-    return EDsPerBlock;
+    return QHsPerBlock;
 }
 
 
-
 IOPhysicalAddress				
-AppleEHCIedMemoryBlock::GetPhysicalPtr(UInt32 index)
+AppleUHCIqhMemoryBlock::GetPhysicalPtr(UInt32 index)
 {
     IOPhysicalAddress		ret = NULL;
-    if (index < EDsPerBlock)
-		ret = _sharedPhysical + (index * sizeof(EHCIQueueHeadShared));
+    if (index < QHsPerBlock)
+		ret = _sharedPhysical + (index * sizeof(UHCIQueueHeadShared));
     return ret;
 }
 
 
-EHCIQueueHeadSharedPtr
-AppleEHCIedMemoryBlock::GetLogicalPtr(UInt32 index)
+UHCIQueueHeadSharedPtr
+AppleUHCIqhMemoryBlock::GetLogicalPtr(UInt32 index)
 {
-    EHCIQueueHeadSharedPtr ret = NULL;
-    if (index < EDsPerBlock)
+    UHCIQueueHeadSharedPtr		ret = NULL;
+    if (index < QHsPerBlock)
 		ret = &_sharedLogical[index];
     return ret;
 }
 
 
-AppleEHCIedMemoryBlock*
-AppleEHCIedMemoryBlock::GetNextBlock(void)
+AppleUHCIqhMemoryBlock*
+AppleUHCIqhMemoryBlock::GetNextBlock(void)
 {
     return _nextBlock;
 }
@@ -96,7 +98,7 @@ AppleEHCIedMemoryBlock::GetNextBlock(void)
 
 
 void
-AppleEHCIedMemoryBlock::SetNextBlock(AppleEHCIedMemoryBlock* next)
+AppleUHCIqhMemoryBlock::SetNextBlock(AppleUHCIqhMemoryBlock* next)
 {
     _nextBlock = next;
 }

@@ -25,41 +25,34 @@
 
 #include <IOKit/usb/IOUSBLog.h>
 
-#include "AppleEHCItdMemoryBlock.h"
+#include "AppleUSBUHCI.h"
+#include "AppleUHCItdMemoryBlock.h"
+#include "AppleUHCIListElement.h"
 
 #define super IOBufferMemoryDescriptor
-OSDefineMetaClassAndStructors(AppleEHCItdMemoryBlock, IOBufferMemoryDescriptor);
+OSDefineMetaClassAndStructors(AppleUHCItdMemoryBlock, IOBufferMemoryDescriptor);
 
-AppleEHCItdMemoryBlock*
-AppleEHCItdMemoryBlock::NewMemoryBlock(void)
+AppleUHCItdMemoryBlock*
+AppleUHCItdMemoryBlock::NewMemoryBlock(void)
 {
-    AppleEHCItdMemoryBlock					*me = new AppleEHCItdMemoryBlock;
-    EHCIGeneralTransferDescriptorSharedPtr	sharedPtr;
+    AppleUHCItdMemoryBlock					*me = new AppleUHCItdMemoryBlock;
     IOByteCount								len;
-    IOPhysicalAddress						sharedPhysical;
-    UInt32									i;
     
     if (!me)
-		USBError(1, "AppleEHCItdMemoryBlock::NewMemoryBlock, constructor failed!");
+		USBError(1, "AppleUHCItdMemoryBlock::NewMemoryBlock, constructor failed!");
 	
     // allocate exactly one physical page
-    if (me && !me->initWithOptions(kIOMemorySharingTypeMask, kEHCIPageSize, kEHCIPageSize)) 
+    if (me && !me->initWithOptions(kIOMemorySharingTypeMask, kUHCIPageSize, kUHCIPageSize)) 
     {
-		USBError(1, "AppleEHCItdMemoryBlock::NewMemoryBlock, initWithOptions failed!");
+		USBError(1, "AppleUHCItdMemoryBlock::NewMemoryBlock, initWithOptions failed!");
 		me->release();
 		return NULL;
     }
     
     me->prepare();
-    sharedPtr = (EHCIGeneralTransferDescriptorSharedPtr)me->getBytesNoCopy();
-    bzero(sharedPtr, kEHCIPageSize);
-    sharedPhysical = me->getPhysicalSegment(0, &len);
-    
-    for (i=0; i < TDsPerBlock; i++)
-    {
-		me->_TDs[i].pPhysical = sharedPhysical+(i * sizeof(EHCIGeneralTransferDescriptorShared));
-		me->_TDs[i].pShared = &sharedPtr[i];
-    }
+    me->_sharedLogical = (UHCITransferDescriptorSharedPtr)me->getBytesNoCopy();
+    bzero(me->_sharedLogical, kUHCIPageSize);
+    me->_sharedPhysical = me->getPhysicalSegment(0, &len);
     
     return me;
 }
@@ -67,23 +60,35 @@ AppleEHCItdMemoryBlock::NewMemoryBlock(void)
 
 
 UInt32
-AppleEHCItdMemoryBlock::NumTDs(void)
+AppleUHCItdMemoryBlock::NumTDs(void)
 {
     return TDsPerBlock;
 }
 
 
 
-EHCIGeneralTransferDescriptorPtr
-AppleEHCItdMemoryBlock::GetTD(UInt32 index)
+IOPhysicalAddress				
+AppleUHCItdMemoryBlock::GetPhysicalPtr(UInt32 index)
 {
-    return (index < TDsPerBlock) ? &_TDs[index] : NULL;
+    IOPhysicalAddress		ret = NULL;
+    if (index < TDsPerBlock)
+		ret = _sharedPhysical + (index * sizeof(UHCITransferDescriptorShared));
+    return ret;
 }
 
 
+UHCITransferDescriptorSharedPtr
+AppleUHCItdMemoryBlock::GetLogicalPtr(UInt32 index)
+{
+    UHCITransferDescriptorSharedPtr ret = NULL;
+    if (index < TDsPerBlock)
+		ret = &_sharedLogical[index];
+    return ret;
+}
 
-AppleEHCItdMemoryBlock*
-AppleEHCItdMemoryBlock::GetNextBlock(void)
+
+AppleUHCItdMemoryBlock*
+AppleUHCItdMemoryBlock::GetNextBlock(void)
 {
     return _nextBlock;
 }
@@ -91,7 +96,7 @@ AppleEHCItdMemoryBlock::GetNextBlock(void)
 
 
 void
-AppleEHCItdMemoryBlock::SetNextBlock(AppleEHCItdMemoryBlock* next)
+AppleUHCItdMemoryBlock::SetNextBlock(AppleUHCItdMemoryBlock* next)
 {
     _nextBlock = next;
 }

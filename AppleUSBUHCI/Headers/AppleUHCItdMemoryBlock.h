@@ -21,30 +21,41 @@
  * limitations under the License.
  * 
  * @APPLE_LICENSE_HEADER_END@
-*/
+ */
 
+
+#ifndef _IOKIT_AppleUHCItdMemoryBlock_H
+#define _IOKIT_AppleUHCItdMemoryBlock_H
 
 #include <IOKit/IOBufferMemoryDescriptor.h>
 
-#include "AppleUSBEHCI.h"
-#include "USBEHCI.h"
+#include "UHCI.h"
+#include "AppleUSBUHCI.h"
+#include "AppleUHCIListElement.h"
 
-class AppleEHCItdMemoryBlock : public IOBufferMemoryDescriptor
+// forward declaration
+class AppleUHCITransferDescriptor;
+
+class AppleUHCItdMemoryBlock : public IOBufferMemoryDescriptor
 {
-    OSDeclareDefaultStructors(AppleEHCItdMemoryBlock);
+    OSDeclareDefaultStructors(AppleUHCItdMemoryBlock);
     
-#define TDsPerBlock	(kEHCIPageSize / sizeof(EHCIGeneralTransferDescriptorShared))
-
+#define TDsPerBlock	(kUHCIPageSize / sizeof(UHCITransferDescriptorShared))
+	
 private:
-    EHCIGeneralTransferDescriptor		_TDs[TDsPerBlock];
-    AppleEHCItdMemoryBlock				*_nextBlock;
+    IOPhysicalAddress							_sharedPhysical;
+    UHCITransferDescriptorSharedPtr				_sharedLogical;
+    AppleUHCItdMemoryBlock						*_nextBlock;
     
 public:
-
-    static AppleEHCItdMemoryBlock		*NewMemoryBlock(void);
-    UInt32								NumTDs(void);
-    EHCIGeneralTransferDescriptorPtr	GetTD(UInt32 index);
-    void								SetNextBlock(AppleEHCItdMemoryBlock *next);
-    AppleEHCItdMemoryBlock				*GetNextBlock(void);
+		
+	static AppleUHCItdMemoryBlock				*NewMemoryBlock(void);
+    void										SetNextBlock(AppleUHCItdMemoryBlock *next);
+    AppleUHCItdMemoryBlock						*GetNextBlock(void);
+    UInt32										NumTDs(void);
+    IOPhysicalAddress							GetPhysicalPtr(UInt32 index);
+    UHCITransferDescriptorSharedPtr				GetLogicalPtr(UInt32 index);
     
 };
+
+#endif
