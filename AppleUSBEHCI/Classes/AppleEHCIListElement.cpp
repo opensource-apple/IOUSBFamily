@@ -67,7 +67,9 @@ AppleEHCIQueueHead::GetSharedLogical(void)
 void 
 AppleEHCIQueueHead::SetPhysicalLink(IOPhysicalAddress next)
 {
+    USBLog(7, "AppleEHCIQueueHead::SetPhysicalLink from %08x to %08x", (int)GetSharedLogical()->nextQH, (int)next);
     GetSharedLogical()->nextQH = HostToUSBLong(next);
+	IOSync();
 }
 
 
@@ -193,6 +195,7 @@ void
 AppleEHCIIsochTransferDescriptor::SetPhysicalLink(IOPhysicalAddress next)
 {
     GetSharedLogical()->nextiTD = HostToUSBLong(next);
+	IOSync();
 }
 
 
@@ -419,6 +422,7 @@ void
 AppleEHCISplitIsochTransferDescriptor::SetPhysicalLink(IOPhysicalAddress next)
 {
     GetSharedLogical()->nextSITD = HostToUSBLong(next);
+	IOSync();
 }
 
 

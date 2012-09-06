@@ -23,6 +23,19 @@
  */
 
 
+#include <AvailabilityMacros.h>
+
+// Set the following to 1 when you don't want to support SSpeed in Zin, previous to a seed:
+#if 0
+	#if defined(MAC_OS_X_VERSION_10_8)
+		#undef SUPPORTS_SS_USB
+	#else
+		#define SUPPORTS_SS_USB 1
+	#endif
+#else
+	#define SUPPORTS_SS_USB 1
+#endif
+
 #import <Foundation/Foundation.h>
 #import <IOKit/usb/IOUSBLib.h>
 #import <IOKit/usb/USB.h>
@@ -43,6 +56,9 @@ typedef struct 	IOUSBInterfaceStruct220**	 		IOUSBInterfaceRef ;
 #define CCID_DESCRIPTOR_LEVEL			INTERFACE_LEVEL + 1
 #define HUB_DESCRIPTOR_LEVEL			ROOT_LEVEL + 1
 #define DEVICE_QUAL_DESCRIPTOR_LEVEL            ROOT_LEVEL + 1
+#ifdef SUPPORTS_SS_USB
+	#define	BOS_DESCRIPTOR_LEVEL			ROOT_LEVEL + 1
+#endif
 
 enum {
     kIntegerOutputStyle = 0,
