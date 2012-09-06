@@ -311,10 +311,10 @@ IOUSBInterfaceClass::GetPropertyInfo(void)
     // Look at the device's properties
     //
     kr = IORegistryEntryCreateCFProperties(fDevice, &entryProperties, NULL, 0);
-	if ( kr )
-		return kr;
+	if (kr)
+        return kr;
 	
-    if ( entryProperties )
+	if ( entryProperties )
     {
         CFTypeRef val;
 		

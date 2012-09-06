@@ -60,7 +60,6 @@
     UInt32					*t;
     char					*s = NULL;
     IOUSBVCInterfaceDescriptor *                desc = (IOUSBVCInterfaceDescriptor *) descriptor;
-    UInt64					uuidHI;
     UInt64					uuidLO;
     UInt32                                      data1;
     UInt16                                      data2, data3;
@@ -600,20 +599,14 @@
                 sprintf((char *)buf, 	"%u", pExtensionUnitDesc->bUnitID );
                 [thisDevice addProperty:"Unit ID:" withValue:buf atDepth:INTERFACE_LEVEL+1];
 
-                uuidHI = pExtensionUnitDesc->guidExtensionCodeHi;
-                uuidLO = pExtensionUnitDesc->guidExtensionCodeLo;
-                
-                // Decode the GUID per section 2.9 of the FAQ
-                //
-                data1 = (uuidHI >> 32 );
-                Swap32(&data1);
-                data2 = (uuidHI >> 16 ) & 0x0000ffff;
-                Swap16(&data2);
-                data3 = (uuidHI & 0x0000ffff);
-                Swap16(&data3);
-                
-                sprintf((char *)buf, 	"%8.8lx-%4.4x-%4.4x-%4.4lx-%12.12qx", data1, data2, data3, 
-                        (UInt32) ( (uuidLO & 0xffff000000000000ULL)>>48), (uuidLO & 0x0000FFFFFFFFFFFFULL) );
+				data1 = USBToHostLong(* (UInt32 *) &pExtensionUnitDesc->guidFormat[0]);
+				data2 = USBToHostWord(* (UInt16 *) &pExtensionUnitDesc->guidFormat[4]);
+				data3 = USBToHostWord(* (UInt16 *) &pExtensionUnitDesc->guidFormat[6]);
+				uuidLO = NXSwapBigLongLongToHost(* (UInt64 *) &pExtensionUnitDesc->guidFormat[8]);
+				
+				
+				sprintf((char *)buf, 	"%8.8lx-%4.4x-%4.4x-%4.4lx-%12.12qx", data1, data2, data3, 
+						(UInt32) ( (uuidLO & 0xffff000000000000ULL)>>48), (uuidLO & 0x0000FFFFFFFFFFFFULL) );
                 [thisDevice addProperty:"Vendor UUID:" withValue:buf atDepth:INTERFACE_LEVEL+1];
 
                 sprintf((char *)buf, 	"%u", pExtensionUnitDesc->bNumControls );
@@ -1008,14 +1001,11 @@
                         
                         // Decode the GUID per section 2.9 of the FAQ
                         //
-                        uuidHI = pUncompressedFormatDesc->guidFormatHi;
-                        uuidLO = pUncompressedFormatDesc->guidFormatLo;
-                        data1 = (uuidHI >> 32 );
-                        Swap32(&data1);
-                        data2 = (uuidHI >> 16 ) & 0x0000ffff;
-                        Swap16(&data2);
-                        data3 = (uuidHI & 0x0000ffff);
-                        Swap16(&data3);
+                        data1 = USBToHostLong(* (UInt32 *) &pUncompressedFormatDesc->guidFormat[0]);
+                        data2 = USBToHostWord(* (UInt16 *) &pUncompressedFormatDesc->guidFormat[4]);
+                        data3 = USBToHostWord(* (UInt16 *) &pUncompressedFormatDesc->guidFormat[6]);
+						uuidLO = NXSwapBigLongLongToHost(* (UInt64 *) &pUncompressedFormatDesc->guidFormat[8]);
+
                         
                         sprintf((char *)buf, 	"%8.8lx-%4.4x-%4.4x-%4.4lx-%12.12qx", data1, data2, data3, 
                                 (UInt32) ( (uuidLO & 0xffff000000000000ULL)>>48), (uuidLO & 0x0000FFFFFFFFFFFFULL) );

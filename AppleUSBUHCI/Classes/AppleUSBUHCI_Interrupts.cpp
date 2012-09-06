@@ -236,7 +236,6 @@ AppleUSBUHCI::HandleInterrupt(void)
 	UInt16					status;
 	UInt32					intrStatus;
 	bool					needReset = false;
-	UHCIAlignmentBuffer		*bp;
 		
 	status = ioRead16(kUHCI_STS);
 

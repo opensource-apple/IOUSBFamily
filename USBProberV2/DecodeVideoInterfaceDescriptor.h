@@ -343,8 +343,7 @@ struct IOUSBVCExtensionUnitDescriptor
     UInt8	bDescriptorType;
     UInt8	bDescriptorSubType;
     UInt8	bUnitID;
-    UInt64	guidExtensionCodeHi;
-    UInt64	guidExtensionCodeLo;
+	UInt8	guidFormat[16];
     UInt8	bNumControls;
     UInt8	bNrInPins;
     UInt8	baSourceID[1];
@@ -482,8 +481,7 @@ struct IOUSBVDC_UncompressedFormatDescriptor
     UInt8	bDescriptorSubType;
     UInt8	bFormatIndex;
     UInt8	bNumFrameDescriptors;
-    UInt64	guidFormatHi;
-    UInt64	guidFormatLo;
+    UInt8	guidFormat[16];
     UInt8	bBitsPerPixel;
     UInt8	bDefaultFrameIndex;
     UInt8	bAspectRatioX;
@@ -544,12 +542,9 @@ struct IOUSBVDC_VendorFormatDescriptor
     UInt8	bDescriptorSubType;
     UInt8	bFormatIndex;
     UInt8	bNumFrameDescriptors;
-    UInt64	guidMajorFormatHi;
-    UInt64	guidMajorFormatLo;
-    UInt64	guidSubFormatHi;
-    UInt64	guidSubFormatLo;
-    UInt64	guidSpecifierFormatHi;
-    UInt64	guidSpecifierFormatLo;
+    UInt8	guidMajorFormat[16];
+    UInt8	guidSubFormat[16];
+    UInt8	guidSpecifierFormat[16];
     UInt8	bPayloadClass;
     UInt8	bDefaultFrameIndex;
     UInt8	bCopyProtect;

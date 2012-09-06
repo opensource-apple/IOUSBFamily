@@ -36,7 +36,7 @@
 // forward declaration
 class AppleUHCITransferDescriptor;
 
-class AppleUHCItdMemoryBlock : public IOBufferMemoryDescriptor
+class AppleUHCItdMemoryBlock : public OSObject
 {
     OSDeclareDefaultStructors(AppleUHCItdMemoryBlock);
     
@@ -46,6 +46,7 @@ private:
     IOPhysicalAddress							_sharedPhysical;
     UHCITransferDescriptorSharedPtr				_sharedLogical;
     AppleUHCItdMemoryBlock						*_nextBlock;
+	IOBufferMemoryDescriptor					*_buffer;
     
 public:
 		

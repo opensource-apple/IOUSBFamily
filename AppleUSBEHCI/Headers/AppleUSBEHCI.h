@@ -28,6 +28,8 @@
 #include <libkern/c++/OSData.h>
 #include <IOKit/IOService.h>
 #include <IOKit/IOFilterInterruptEventSource.h>
+#include <IOKit/IOBufferMemoryDescriptor.h>
+#include <IOKit/IODMACommand.h>
 #include <IOKit/pci/IOPCIBridge.h>
 #include <IOKit/pci/IOPCIDevice.h>
 
@@ -59,11 +61,6 @@ __attribute__((format(printf, 1, 2)));
 #else
 #define IOSync() __asm__ __volatile__ ( "mfence" : : : "memory" )
 #endif
-
-extern "C" {
-    extern int	kvtophys(vm_offset_t);
-    extern void delay(int);
-};
 
 struct InterruptTransaction {
     IOMemoryDescriptor *		buf;
@@ -106,6 +103,15 @@ struct EHCIGeneralTransferDescriptor
 	
 };
 
+struct EHCIDoneQueueParams 
+{ 
+	EHCIGeneralTransferDescriptorPtr		pHCDoneTD; 
+	OSStatus								forceErr;  
+	IOUSBCompletionAction					safeAction; 
+	EHCIGeneralTransferDescriptorPtr		stopAt; 
+};
+
+
 
 enum{
 	kEHCIElementTypeBad = 0,
@@ -142,7 +148,8 @@ private:
     unsigned long		initialPowerStateForDomainState ( IOPMPowerFlags domainState );
     virtual IOReturn	setPowerState( unsigned long, IOService* );
     static IOReturn 	PowerDownHandler(void *target, void *refCon, UInt32 messageType, IOService *service, void *messageArgument, vm_size_t argSize);
-    
+ 	UInt32				ExpressCardPort( IOService * provider );
+   
 	
     void							showRegisters(char *s);
     void							printTD(EHCIGeneralTransferDescriptorPtr pTD, int level);
@@ -161,7 +168,6 @@ protected:
     UInt16									_deviceID;
     UInt16									_revisionID;
     UInt32									_errataBits;						// various bits for chip erratas
-    UInt32									_pageSize;							// OS Logical page size
     EHCICapRegistersPtr						_pEHCICapRegisters;					// Capabilities registers
     EHCIRegistersPtr						_pEHCIRegisters;					// Pointer to base address of EHCI registers.
     UInt32									_dataAllocationSize;				// # of bytes allocated in for TD's
@@ -174,6 +180,7 @@ protected:
     AppleEHCIIsochTransferDescriptor		*_pLastFreeITD;						// last of availabble Trasfer Descriptors
     AppleEHCISplitIsochTransferDescriptor	*_pLastFreeSITD;					// last of availabble Trasfer Descriptors
     AppleEHCIQueueHead						*_pLastFreeQH;						// last of available Endpoint Descriptors
+	IOBufferMemoryDescriptor				*_periodicListBuffer;				// IOBMD for the periodic list
     IOPhysicalAddress						*_periodicList;						// Physical interrrupt heads
     IOUSBControllerListElement				**_logicalPeriodicList;				// logical interrupt heads
     UInt16									_periodicBandwidth[kEHCIMaxPoll];	// bandwidth remaining per frame
@@ -212,7 +219,7 @@ protected:
 	UInt8									_periodicScheduleUnsynchCount;
     UInt32									_isochBandwidthAvail;					// amount of available bandwidth for Isochronous transfers
     UInt32									_periodicEDsInSchedule;					// interrupt endpoints
-    volatile UInt64							_frameNumber;							// the current frame number
+    UInt64									_frameNumber;							// the current frame number
     UInt16									_rootHubFuncAddress;					// Function Address for the root hub
     struct InterruptTransaction				_outstandingTrans[kMaxOutstandingTrans];
     struct  {
@@ -239,10 +246,16 @@ protected:
     AbsoluteTime							_lastCheckedTime;						// Last time we checked the Root Hub for inactivity
 	UInt32									_rhPrevStatus[kMaxPorts];				// Previous status of the root hub SC registers
 	UInt32									_rhChangeBits[kMaxPorts];				// Change bits of the root hub
+	UInt32									_ExpressCardPort;						// port number (1-based) where we have an ExpressCard connector
     IONotifier *                            _powerDownNotifier;
 	bool									_needToCreateRootHub;					// True if we need to create the root hub post wake
 	bool									_gangedOvercurrent;						// True if our root hubs reports overcurrent on all ports
+	bool									_badExpressCardAttached;				// True if a driver has identified a bad ExpressCard
 	thread_call_t							_portDetectInterruptThread;
+	
+	// dealing with doneQueue reentrancy
+	UInt32									_nextDoneQueue;
+	struct EHCIDoneQueueParams				_doneQueueParams[20];
 	
     // methods
     
@@ -345,25 +358,9 @@ protected:
 	
     IOReturn			AcquireOSOwnership(void);
 
-    IOReturn 		CreateHSIsochTransfer(	AppleEHCIIsochEndpoint				*pEP,
-											IOUSBIsocCompletion					completion,
-											UInt64								frameNumberStart,
-											IOMemoryDescriptor					*pBuffer,
-											UInt32								frameCount,
-											IOUSBLowLatencyIsocFrame			*pFrames,
-											UInt32								updateFrequency = 0,
-											bool								lowLatency = false,
-											bool								requestFromRosettaClient = false);
+    IOReturn 		CreateHSIsochTransfer(AppleEHCIIsochEndpoint *pEP, IOUSBIsocCommand *command);
 
-    IOReturn 		CreateSplitIsochTransfer(AppleEHCIIsochEndpoint				*pEP,
-											 IOUSBIsocCompletion				completion,
-											 UInt64								frameNumberStart,
-											 IOMemoryDescriptor					*pBuffer,
-											 UInt32								frameCount,
-											 IOUSBIsocFrame						*pFrames,				// could be IOUSBLowLatencyIsocFrame*
-											 UInt32								updateFrequency = 0,
-											 bool								lowLatency = false,
-											 bool								requestFromRosettaClient = false);
+    IOReturn 		CreateSplitIsochTransfer(AppleEHCIIsochEndpoint *pEP, IOUSBIsocCommand *command);
 	
 	void  ReturnOneTransaction(EHCIGeneralTransferDescriptor 	*transaction,
 							   AppleEHCIQueueHead				*pED,
@@ -515,6 +512,7 @@ public:
 											int					highSpeedPort,
 											UInt8				interval);
 	
+	// obsolete method
     virtual IOReturn UIMCreateIsochTransfer(short					functionAddress,
 											short					endpointNumber,
 											IOUSBIsocCompletion		completion,
@@ -580,6 +578,7 @@ public:
     IOReturn GetRootHubStringDescriptor(UInt8	index, OSData *desc);
     AbsoluteTime	LastRootHubPortStatusChanged( bool reset );
 	
+	// obsolete method
     virtual IOReturn 		UIMCreateIsochTransfer(short					functionAddress,
 												   short					endpointNumber,
 												   IOUSBIsocCompletion		completion,
@@ -590,6 +589,8 @@ public:
 												   IOUSBLowLatencyIsocFrame *pFrames,
 												   UInt32					updateFrequency);
 	
+	// new method
+	virtual IOReturn		UIMCreateIsochTransfer(IOUSBIsocCommand *command);
 	
     virtual IOReturn 		UIMHubMaintenance(USBDeviceAddress highSpeedHub, UInt32 highSpeedPort, UInt32 command, UInt32 flags);
     virtual IOReturn		UIMSetTestMode(UInt32 mode, UInt32 port);
@@ -605,6 +606,8 @@ public:
 	
 	virtual IOUSBControllerIsochEndpoint*			AllocateIsochEP();
     virtual void									ReturnIsochDoneQueue(IOUSBControllerIsochEndpoint*);
+
+	virtual IODMACommand							*GetNewDMACommand();
 	
 
 };

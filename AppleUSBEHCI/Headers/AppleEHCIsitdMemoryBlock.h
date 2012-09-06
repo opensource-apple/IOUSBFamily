@@ -27,7 +27,7 @@
 #include "AppleUSBEHCI.h"
 #include "USBEHCI.h"
 
-class AppleEHCIsitdMemoryBlock : public IOBufferMemoryDescriptor
+class AppleEHCIsitdMemoryBlock : public OSObject
 {
     OSDeclareDefaultStructors(AppleEHCIsitdMemoryBlock);
     
@@ -37,6 +37,7 @@ private:
     IOPhysicalAddress							_sharedPhysical;
     EHCISplitIsochTransferDescriptorSharedPtr	_sharedLogical;
     AppleEHCIsitdMemoryBlock					*_nextBlock;
+	IOBufferMemoryDescriptor					*_buffer;
     
 public:
 

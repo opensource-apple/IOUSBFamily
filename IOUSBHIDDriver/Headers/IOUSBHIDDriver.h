@@ -146,7 +146,10 @@ public:
     virtual bool		start(IOService * provider);
     virtual bool		didTerminate( IOService * provider, IOOptionBits options, bool * defer );
     virtual bool		willTerminate( IOService * provider, IOOptionBits options );
+    virtual void		stop(IOService *  provider);
+#if !(defined(__ppc__) && defined(KPI_10_4_0_PPC_COMPAT))
     virtual void		free();
+#endif
     virtual IOReturn 	message( UInt32 type, IOService * provider,  void * argument = 0 );
     
 
@@ -216,6 +219,7 @@ public:
     OSMetaClassDeclareReservedUsed(IOUSBHIDDriver,  0);
     virtual IOReturn    RearmInterruptRead();
     
+#if !(defined(__ppc__) && defined(KPI_10_4_0_PPC_COMPAT))
     /*!
 		@function SuspendPort
 	 @abstract Suspends the port for this device or optionally sets a timeout to suspend after a period of inactivity.
@@ -234,6 +238,11 @@ public:
 	
     OSMetaClassDeclareReservedUsed(IOUSBHIDDriver,  3);
     virtual void		LogMemReport(UInt8 level, IOMemoryDescriptor * reportBuffer, IOByteCount size);
+#else
+    OSMetaClassDeclareReservedUnused(IOUSBHIDDriver,  1);
+    OSMetaClassDeclareReservedUnused(IOUSBHIDDriver,  2);
+    OSMetaClassDeclareReservedUnused(IOUSBHIDDriver,  3);
+#endif
 
     OSMetaClassDeclareReservedUnused(IOUSBHIDDriver,  4);
     OSMetaClassDeclareReservedUnused(IOUSBHIDDriver,  5);

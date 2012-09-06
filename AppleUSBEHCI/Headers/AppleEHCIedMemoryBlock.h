@@ -22,21 +22,24 @@
  * @APPLE_LICENSE_HEADER_END@
  */
 
+#include <libkern/c++/OSObject.h>
 #include <IOKit/IOBufferMemoryDescriptor.h>
 
 #include "AppleUSBEHCI.h"
 #include "USBEHCI.h"
 
-class AppleEHCIedMemoryBlock : public IOBufferMemoryDescriptor
+class AppleEHCIedMemoryBlock : public OSObject
 {
-    OSDeclareDefaultStructors(AppleEHCIedMemoryBlock);
     
+	OSDeclareDefaultStructors(AppleEHCIedMemoryBlock)
+	
 #define EDsPerBlock	(kEHCIPageSize / sizeof(EHCIQueueHeadShared))
 
 private:
     IOPhysicalAddress			_sharedPhysical;
     EHCIQueueHeadSharedPtr		_sharedLogical;
     AppleEHCIedMemoryBlock		*_nextBlock;
+	IOBufferMemoryDescriptor	*_buffer;
     
 public:
 

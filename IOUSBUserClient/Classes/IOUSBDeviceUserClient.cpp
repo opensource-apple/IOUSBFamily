@@ -366,11 +366,11 @@ IOUSBDeviceUserClient::start( IOService * provider )
     
 ErrorExit:
 		
-		if ( commandGate != NULL )
-		{
-			commandGate->release();
-			commandGate = NULL;
-		}
+	if ( commandGate != NULL )
+	{
+		commandGate->release();
+		commandGate = NULL;
+	}
 	
     if ( workLoop != NULL )
     {
@@ -398,7 +398,10 @@ IOUSBDeviceUserClient::open(bool seize)
 		if (fOwner->open(this, options))
 			fNeedToClose = false;
 		else
+		{
+			USBLog(5, "%s[%p]::open fOwner->open() failed.  Returning kIOReturnExclusiveAccess", getName(), this);
 			ret = kIOReturnExclusiveAccess;
+		}
     }
     else
         ret = kIOReturnNotAttached;
@@ -1220,29 +1223,33 @@ IOUSBDeviceUserClient::stop(IOService * provider)
     
     USBLog(7, "+%s[%p]::stop(%p)", getName(), this, provider);
 
+    if (fGate)
+    {
+		if (fWorkLoop)
+			fWorkLoop->removeEventSource(fGate);
+		
+		fGate->release();
+		fGate = NULL;
+    }
     super::stop(provider);
 
     USBLog(7, "-%s[%p]::stop(%p)", getName(), this, provider);
 
 }
 
+
+
 void 
 IOUSBDeviceUserClient::free()
 {
     USBLog(7,"IOUSBDeviceUserClient::free");
-    if (fGate)
-    {
+
 	if (fWorkLoop)
 	{
-	    fWorkLoop->removeEventSource(fGate);
-            fWorkLoop->release();
-            fWorkLoop = NULL;
+		fWorkLoop->release();
+		fWorkLoop = NULL;
 	}
-
-	fGate->release();
-	fGate = NULL;
-    }
-
+		
     super::free();
 }
 
@@ -1321,6 +1328,36 @@ IOUSBDeviceUserClient::didTerminate( IOService * provider, IOOptionBits options,
 }
 
 
+IOReturn 
+IOUSBDeviceUserClient::message( UInt32 type, IOService * provider,  void * argument )
+{
+    IOReturn	err = kIOReturnSuccess;
+    
+    switch ( type )
+    {
+        case kIOUSBMessagePortHasBeenSuspended:
+			USBLog(6, "%s[%p]::message - received kIOUSBMessagePortHasBeenSuspended", getName(), this);
+            break;
+			
+        case kIOUSBMessagePortHasBeenReset:
+ 			USBLog(6, "%s[%p]::message - received kIOUSBMessagePortHasBeenReset", getName(), this);
+            break;
+			
+		case kIOUSBMessagePortHasBeenResumed:
+			USBLog(6, "%s[%p]::message - received kIOUSBMessagePortHasBeenResumed", getName(), this);
+            break;
+			
+        case kIOMessageServiceIsTerminated: 
+			USBLog(6, "%s[%p]::message - received kIOMessageServiceIsTerminated", getName(), this);
+            break;
+            
+        default:
+            break;
+    }
+    
+    return err;
+}
+
 void
 IOUSBDeviceUserClient::DecrementOutstandingIO(void)
 {
@@ -1350,11 +1387,12 @@ IOUSBDeviceUserClient::IncrementOutstandingIO(void)
 {
     if (!fGate)
     {
-	fOutstandingIO++;
-	return;
+		fOutstandingIO++;
+		return;
     }
     fGate->runAction(ChangeOutstandingIO, (void*)1);
 }
+
 
 
 IOReturn
@@ -1404,7 +1442,7 @@ IOUSBDeviceUserClient::GetOutstandingIO()
     
     if (!fGate)
     {
-	return fOutstandingIO;
+		return fOutstandingIO;
     }
     
     fGate->runAction(GetGatedOutstandingIO, (void*)&count);

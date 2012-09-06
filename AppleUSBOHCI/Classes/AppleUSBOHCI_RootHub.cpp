@@ -862,7 +862,7 @@ void AppleUSBOHCI::SimulateRootHubInt(UInt8							endpoint,
 			
 			if ( elapsedTime < kOHCIRootHubPollingInterval )
 			{
-				USBLog(5, "AppleUSBOHCI[%p]::SimulateRootHubInt  Last change was %qd ms ago.  IOSleep'ing for %qd ms",  this, elapsedTime, kOHCIRootHubPollingInterval - elapsedTime );
+				USBLog(5, "AppleUSBOHCI[%p]::SimulateRootHubInt  Last change was %qd ms ago.  IOSleep'ing for %qd ms, _workLoop->inGate = %d",  this, elapsedTime, kOHCIRootHubPollingInterval - elapsedTime, _workLoop->inGate() );
 				IOSleep( kOHCIRootHubPollingInterval - elapsedTime );
 			}
 

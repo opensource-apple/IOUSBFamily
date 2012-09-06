@@ -617,6 +617,7 @@ IOUSBDeviceClass::USBDeviceOpen(bool seize)
     IOReturn 		ret;
     int			t = seize;
 
+	DEBUGPRINT("+IOUSBDeviceClass[%p]::USBDeviceOpen\n", this);
     connectCheck();
 
     if (fIsOpen)
@@ -650,6 +651,7 @@ IOUSBDeviceClass::USBDeviceOpen(bool seize)
 		ret = kIOReturnNoDevice;
     }
 
+	DEBUGPRINT("+IOUSBDeviceClass[%p]::USBDeviceOpen returns 0x%x\n", this, ret);
     return ret;
 }
 

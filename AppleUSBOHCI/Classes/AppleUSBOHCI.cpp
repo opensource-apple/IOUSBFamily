@@ -219,14 +219,6 @@ AppleUSBOHCI::UIMInitialize(IOService * provider)
 			break;
         }
 		
-        _genCursor = IONaturalMemoryCursor::withSpecification(PAGE_SIZE, PAGE_SIZE);
-        if(!_genCursor)
-            break;
-		
-        _isoCursor = IONaturalMemoryCursor::withSpecification(kUSBMaxFSIsocEndpointReqCount,  kUSBMaxFSIsocEndpointReqCount);
-        if(!_isoCursor)
-            break;
-		
         /*
          * Initialize my data and the hardware
          */
@@ -252,7 +244,6 @@ AppleUSBOHCI::UIMInitialize(IOService * provider)
         
         USBLog(5,"AppleUSBOHCI[%p]::UIMInitialize errata bits=%lx", this, _errataBits);
 		
-        _pageSize = PAGE_SIZE;
         _pOHCIRegisters = (OHCIRegistersPtr) _deviceBase->getVirtualAddress();
 		
 #if (DEBUGGING_LEVEL > 2)
@@ -524,17 +515,6 @@ AppleUSBOHCI::UIMFinalize(void)
     
     // Release the memory cursors
     //
-    if ( _genCursor )
-    {
-        _genCursor->release();
-        _genCursor = NULL;
-    }
-    
-    if ( _isoCursor )
-    {
-        _isoCursor->release();
-        _isoCursor = NULL;
-    }
 	
     _uimInitialized = false;
     
@@ -616,29 +596,24 @@ AppleUSBOHCI::doCallback(AppleOHCIGeneralTransferDescriptorPtr	nextTD,
 UInt32 
 AppleUSBOHCI::findBufferRemaining (AppleOHCIGeneralTransferDescriptorPtr pCurrentTD)
 {
-    UInt32                      pageMask;
+    UInt32                      pageNumMask;
     UInt32                      bufferSizeRemaining;
 	
 	
-    pageMask = ~(_pageSize - 1);
+    pageNumMask = ~PAGE_MASK;
 	
     if (pCurrentTD->pShared->currentBufferPtr == 0)
     {
         bufferSizeRemaining = 0;
     }
-    else if ((USBToHostLong(pCurrentTD->pShared->bufferEnd) & (pageMask)) ==
-             (USBToHostLong(pCurrentTD->pShared->currentBufferPtr)& (pageMask)))
+    else if ((USBToHostLong(pCurrentTD->pShared->bufferEnd) & (pageNumMask)) == (USBToHostLong(pCurrentTD->pShared->currentBufferPtr) & (pageNumMask)))
     {
         // we're on the same page
-        bufferSizeRemaining =
-        (USBToHostLong (pCurrentTD->pShared->bufferEnd) & ~pageMask) -
-        (USBToHostLong (pCurrentTD->pShared->currentBufferPtr) & ~pageMask) + 1;
+        bufferSizeRemaining = (USBToHostLong (pCurrentTD->pShared->bufferEnd) & PAGE_MASK) - (USBToHostLong (pCurrentTD->pShared->currentBufferPtr) & PAGE_MASK) + 1;
     }
     else
     {
-        bufferSizeRemaining =
-        ((USBToHostLong(pCurrentTD->pShared->bufferEnd) & ~pageMask) + 1)  +
-        (_pageSize - (USBToHostLong(pCurrentTD->pShared->currentBufferPtr) & ~pageMask));
+        bufferSizeRemaining = ((USBToHostLong(pCurrentTD->pShared->bufferEnd) & PAGE_MASK) + 1)  + (PAGE_SIZE - (USBToHostLong(pCurrentTD->pShared->currentBufferPtr) & PAGE_MASK));
     }
 	
     return (bufferSizeRemaining);
@@ -2079,4 +2054,15 @@ AppleUSBOHCI::free()
     
     super::free();
 }
+
+
+
+IODMACommand*
+AppleUSBOHCI::GetNewDMACommand()
+{
+	return IODMACommand::withSpecification(kIODMACommandOutputHost64, 32, PAGE_SIZE);
+}
+
+
+
 

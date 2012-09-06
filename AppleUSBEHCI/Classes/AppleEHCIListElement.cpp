@@ -384,7 +384,7 @@ AppleEHCISplitIsochTransferDescriptor::UpdateFrameList(AbsoluteTime timeStamp)
     // warning - this method can run at primary interrupt time, which can cause a panic if it logs too much
     // USBLog(7, "AppleEHCISplitIsochTransferDescriptor[%p]::UpdateFrameList statFlags (%x)", this, statFlags);
     pFrames = _pFrames;
-	if (!pFrames)							// this will be the case for the dummy TD
+	if (!pFrames || _isDummySITD)							// this will be the case for the dummy TD
 		return kIOReturnSuccess;
 	
     pLLFrames = (IOUSBLowLatencyIsocFrame*)_pFrames;

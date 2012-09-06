@@ -97,67 +97,6 @@ AppleUHCIQueueHead::print(int level)
 }
 
 
-UHCIAlignmentBuffer *
-AppleUHCIQueueHead::GetAlignmentBuffer()
-{
-	UHCIAlignmentBuffer			*ap;
-	UInt32						align;
-	
-	if (queue_empty(&freeBuffers)) 
-	{
-		unsigned int		i, count;
-		UHCIMemoryBuffer *	bp;
-		IOPhysicalAddress	pPhysical;
-		IOVirtualAddress	vaddr;
-		
-		bp = UHCIMemoryBuffer::newBuffer();
-		if (bp == NULL) 
-		{
-			USBError(1, "AppleUSBUHCI[%p]::EndpointAllocBuffer - Error allocating alignment buffer memory", this);
-			return NULL;
-		}
-		pPhysical = bp->getPhysicalAddress();
-		vaddr = (IOVirtualAddress)bp->getBytesNoCopy();
-		
-		queue_enter(&allocatedBuffers, bp, UHCIMemoryBuffer *, _chain);
-		
-		align = ((maxPacketSize + kUHCI_BUFFER_ALIGN - 1) / kUHCI_BUFFER_ALIGN) * kUHCI_BUFFER_ALIGN;
-		count = PAGE_SIZE / align;
-		
-		for (i=0; i<count; i++) 
-		{
-			ap = (UHCIAlignmentBuffer *)IOMalloc(sizeof(UHCIAlignmentBuffer));
-			
-			ap->paddr = pPhysical;
-			ap->vaddr = vaddr;
-			queue_enter(&freeBuffers, ap, UHCIAlignmentBuffer *, chain);
-			USBLog(4, "AppleUSBUHCI[%p]::EndpointAllocBuffer - Creating alignment buffer %p align %p with pPhysical %p", this, ap, (void*)align, (void*)ap->paddr);
-			ap++;
-			pPhysical += align;
-			vaddr += align;
-		}
-	}
-	
-	queue_remove_first(&freeBuffers, ap, UHCIAlignmentBuffer *, chain);
-	buffersInUse++;
-	ap->userBuffer = NULL;
-	ap->userOffset = 0;
-	ap->userAddr = NULL;
-	return ap;
-}
-
-
-void
-AppleUHCIQueueHead::ReleaseAlignmentBuffer(UHCIAlignmentBuffer *ap)
-{
-	USBLog(6, "AppleUHCIQueueHead[%p]::ReleaseAlignmentBuffer - putting alignment buffer %p into freeBuffers - buffersInUse = %d", this, ap, buffersInUse);
-	queue_enter(&freeBuffers, ap, UHCIAlignmentBuffer *, chain);
-	buffersInUse--;
-}
-
-
-
-
 
 // -----------------------------------------------------------------
 //		AppleUHCITransferDescriptor
@@ -264,7 +203,7 @@ AppleUHCITransferDescriptor::print(int level)
 		   (unsigned int)UHCI_TD_GET_MAXLEN(value),
 		   (value & kUHCI_TD_D) ? "D" : "");
 	USBLog(level, "AppleUHCITransferDescriptor::print       shared.buffer %08x", USBToHostLong(shared->buffer));
-	USBLog(level, "AppleUHCITransferDescriptor::print - alignment buffer[%p]", buffer);
+	USBLog(level, "AppleUHCITransferDescriptor::print - alignment buffer[%p]", alignBuffer);
 	USBLog(level, "AppleUHCITransferDescriptor::print - command[%p]", command);
 	USBLog(level, "AppleUHCITransferDescriptor::print - memory descriptor[%p]", logicalBuffer);
 	USBLog(level, "AppleUHCITransferDescriptor::print - lastTDofTransaction[%s]", lastTDofTransaction ? "true" : "false");
@@ -406,10 +345,12 @@ AppleUHCIIsochTransferDescriptor::UpdateFrameList(AbsoluteTime timeStamp)
 		}
     }
 
-    if (buffer && (_pEndpoint->direction == kUSBIn))
+    if (alignBuffer && (_pEndpoint->direction == kUSBIn))
 	{
 		// i can't log in here because this is called at interrupt time
-		buffer->userBuffer->writeBytes(buffer->userOffset, (void*)buffer->vaddr, frActualCount);
+		// i know that this is OK for Low Latency because the buffer will be allocated in low memory and wont' be bounced
+		alignBuffer->userBuffer->writeBytes(alignBuffer->userOffset, (void*)alignBuffer->vaddr, frActualCount);
+		alignBuffer->actCount = frActualCount;
 	}
 	
 	
@@ -515,89 +456,6 @@ AppleUHCIIsochTransferDescriptor::print(int level)
 		   (unsigned int)UHCI_TD_GET_MAXLEN(value),
 		   (value & kUHCI_TD_D) ? "D" : "");
 	USBLog(level, "AppleUHCIIsochTransferDescriptor::print       shared.buffer %08x", USBToHostLong(shared->buffer));
-	USBLog(level, "AppleUHCIIsochTransferDescriptor::print - alignment buffer[%p]", buffer);
+	USBLog(level, "AppleUHCIIsochTransferDescriptor::print - alignment buffer[%p]", alignBuffer);
 	USBLog(level, "AppleUHCIIsochTransferDescriptor::print -----------------------------------");
 }
-
-
-
-#undef super
-#define super IOUSBControllerIsochEndpoint
-OSDefineMetaClassAndStructors(AppleUHCIIsochEndpoint, IOUSBControllerIsochEndpoint)
-// -----------------------------------------------------------------
-//		AppleUHCIIsochEndpoint
-// -----------------------------------------------------------------
-bool
-AppleUHCIIsochEndpoint::init()
-{
-	int			i;
-	
-	queue_init(&allocatedBuffers);
-	queue_init(&freeBuffers);
-	buffersInUse = 0;
-	return true;
-}
-
-
-UHCIAlignmentBuffer *
-AppleUHCIIsochEndpoint::GetAlignmentBuffer()
-{
-	UHCIAlignmentBuffer			*ap;
-	UInt32						align;
-	
-	if (queue_empty(&freeBuffers)) 
-	{
-		unsigned int		i, count;
-		UHCIMemoryBuffer *	bp;
-		IOPhysicalAddress	pPhysical;
-		IOVirtualAddress	vaddr;
-		
-		bp = UHCIMemoryBuffer::newBuffer();
-		if (bp == NULL) 
-		{
-			USBError(1, "AppleUSBUHCI[%p]::EndpointAllocBuffer - Error allocating alignment buffer memory", this);
-			return NULL;
-		}
-		pPhysical = bp->getPhysicalAddress();
-		vaddr = (IOVirtualAddress)bp->getBytesNoCopy();
-		
-		queue_enter(&allocatedBuffers, bp, UHCIMemoryBuffer *, _chain);
-		
-		align = ((maxPacketSize + kUHCI_BUFFER_ALIGN - 1) / kUHCI_BUFFER_ALIGN) * kUHCI_BUFFER_ALIGN;
-		count = PAGE_SIZE / align;
-		
-		for (i=0; i<count; i++) 
-		{
-			ap = (UHCIAlignmentBuffer *)IOMalloc(sizeof(UHCIAlignmentBuffer));
-			
-			ap->paddr = pPhysical;
-			ap->vaddr = vaddr;
-			queue_enter(&freeBuffers, ap, UHCIAlignmentBuffer *, chain);
-			USBLog(4, "AppleUSBUHCI[%p]::EndpointAllocBuffer - Creating alignment buffer %p align %p with pPhysical %p", this, ap, (void*)align, (void*)ap->paddr);
-			ap++;
-			pPhysical += align;
-			vaddr += align;
-		}
-	}
-	
-	queue_remove_first(&freeBuffers, ap, UHCIAlignmentBuffer *, chain);
-	buffersInUse++;
-	ap->userBuffer = NULL;
-	ap->userOffset = 0;
-	ap->userAddr = NULL;
-	return ap;
-}
-
-
-void
-AppleUHCIIsochEndpoint::ReleaseAlignmentBuffer(UHCIAlignmentBuffer *ap)
-{
-	USBLog(6, "AppleUHCIIsochEndpoint[%p]::ReleaseAlignmentBuffer - putting alignment buffer %p into freeBuffers - buffersInUse = %d", this, ap, buffersInUse);
-	queue_enter(&freeBuffers, ap, UHCIAlignmentBuffer *, chain);
-	buffersInUse--;
-}
-
-
-
-
-

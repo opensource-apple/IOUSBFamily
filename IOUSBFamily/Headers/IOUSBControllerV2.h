@@ -23,6 +23,8 @@
 #ifndef _IOKIT_IOUSBCONTROLLERV2_H
 #define _IOKIT_IOUSBCONTROLLERV2_H
 
+#include <IOKit/IODMACommand.h>
+
 #include <IOKit/usb/IOUSBControllerListElement.h>
 #include <IOKit/usb/IOUSBController.h>
 
@@ -88,15 +90,17 @@ protected:
 	#define _returnIsochDoneQueueThread			_v2ExpansionData->_returnIsochDoneQueueThread
 	
     virtual bool 		init( OSDictionary *  propTable );
-    virtual bool 		start( IOService *  provider );
+ #if !(defined(__ppc__) && defined(KPI_10_4_0_PPC_COMPAT))
+   	virtual bool 		start( IOService *  provider );
     virtual void		free();
+#endif
 
     static IOReturn  DoCreateEP(OSObject *owner,
                            void *arg0, void *arg1,
                            void *arg2, void *arg3);
 
     static void		clearTTHandler( 
-			    OSObject *	target,
+							OSObject *	target,
                             void *	parameter,
                             IOReturn	status,
                             UInt32	bufferSizeRemaining );
@@ -296,6 +300,7 @@ public:
 														UInt8				interval);
 
 
+#if !(defined(__ppc__) && defined(KPI_10_4_0_PPC_COMPAT))
     OSMetaClassDeclareReservedUsed(IOUSBControllerV2,  9);
 	virtual IOUSBControllerIsochEndpoint*		IOUSBControllerV2::AllocateIsochEP(void);	
 	
@@ -329,8 +334,35 @@ public:
     OSMetaClassDeclareReservedUsed(IOUSBControllerV2,  19);
     virtual void								ReturnIsochDoneQueue(IOUSBControllerIsochEndpoint*);
 
+    OSMetaClassDeclareReservedUsed(IOUSBControllerV2,  20);
+	virtual IODMACommand						*GetNewDMACommand();
+	
+    OSMetaClassDeclareReservedUsed(IOUSBControllerV2,  21);
+	/*!
+		@function GetLowLatencyOptionsAndPhysicalMask
+	 @abstract Low Latency transfers require that the client have access to the memory after the Isochronous I/O request has already been scheduled. This might be used, for example to fill in outgoing data "just in time." Some controllers, however, may have requirements which need to be followed in order to make sure that the memory buffer isn't moved after the call is made. This call will return an IOOptionBits and mach_vm_address_t which can be used in a call to IOBufferMemoryDescriptor::inTaskWithPhysicalMask which will help meet these requirements.
+	 @param optionBits Pointer to an an IOOptionBits. The only bit which may be returned is kIOMemoryPhysicallyContiguous. Other bits, e.g. direction bits, must be ORd in by the client as needed. This call replaces the old property based method of obtaining this information.
+	 @param physicalMask  Pointer to a mach_vm_address_t which should be used in the call to IOBufferMemoryDescriptor::inTaskWithPhysicalMask and will guarantee that when the memory is wired down it will be accessible by both the client and the USB controller at the same time.
+	 @result returns kIOReturnSuccess if the method is implemented by the controller, otherwise 
+	 */
+    virtual IOReturn 		GetLowLatencyOptionsAndPhysicalMask(IOOptionBits *optionBits, mach_vm_address_t *physicalMask);
+	
+#else
+    OSMetaClassDeclareReservedUnused(IOUSBControllerV2,   9);
+    OSMetaClassDeclareReservedUnused(IOUSBControllerV2,  10);
+    OSMetaClassDeclareReservedUnused(IOUSBControllerV2,  11);
+    OSMetaClassDeclareReservedUnused(IOUSBControllerV2,  12);
+    OSMetaClassDeclareReservedUnused(IOUSBControllerV2,  13);
+    OSMetaClassDeclareReservedUnused(IOUSBControllerV2,  14);
+    OSMetaClassDeclareReservedUnused(IOUSBControllerV2,  15);
+    OSMetaClassDeclareReservedUnused(IOUSBControllerV2,  16);
+    OSMetaClassDeclareReservedUnused(IOUSBControllerV2,  17);
+    OSMetaClassDeclareReservedUnused(IOUSBControllerV2,  18);
+    OSMetaClassDeclareReservedUnused(IOUSBControllerV2,  19);
     OSMetaClassDeclareReservedUnused(IOUSBControllerV2,  20);
     OSMetaClassDeclareReservedUnused(IOUSBControllerV2,  21);
+#endif
+	
     OSMetaClassDeclareReservedUnused(IOUSBControllerV2,  22);
     OSMetaClassDeclareReservedUnused(IOUSBControllerV2,  23);
     OSMetaClassDeclareReservedUnused(IOUSBControllerV2,  24);

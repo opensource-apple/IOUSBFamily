@@ -68,7 +68,8 @@ enum
 	kErrataICH6PowerSequencing		= (1 << 11),	// needs special power sequencing for early Transition machines
 	kErrataICH7ISTBuffer			= (1 << 12),	// buffer for Isochronous Scheduling Threshold
 	kErrataUHCISupportsOvercurrent	= (1 << 13),	// UHCI controller supports overcurrent detection
-	kErrataNeedsOvercurrentDebounce = (1 << 14)		// The overcurrent indicator should be debounced by 10ms
+	kErrataNeedsOvercurrentDebounce = (1 << 14),	// The overcurrent indicator should be debounced by 10ms
+	kErrataSupportsPortResumeEnable = (1 << 15)		// UHCI has resume enable bits at config address 0xC4
 };
 
 enum
@@ -190,12 +191,16 @@ protected:
 
     // The following methods do not use and upper case initial letter because they are part of IOKit
     //
+
+public:
     virtual bool 		init( OSDictionary *  propTable );
     virtual bool 		start( IOService *  provider );
     virtual void 		stop( IOService * provider );
     virtual bool 		finalize(IOOptionBits options);
     virtual IOReturn 		message( UInt32 type, IOService * provider,  void * argument = 0 );
- 
+
+protected:
+		
     IOReturn			getNubResources( IOService *  regEntry );
 
     virtual UInt32 		GetErrataBits(
@@ -1073,7 +1078,18 @@ public:
     OSMetaClassDeclareReservedUsed(IOUSBController,  17);
     virtual IOReturn 		CheckForDisjointDescriptor(IOUSBCommand *command, UInt16 maxPacketSize);
     
+#if !(defined(__ppc__) && defined(KPI_10_4_0_PPC_COMPAT))
+    /*!
+		@function UIMCreateIsochTransfer
+	 @abstract UIM function, Do a transfer on an Isocchronous endpoint.
+	 @param command  an IOUSBIsocCommand object with all the necessary information
+	 */
+    OSMetaClassDeclareReservedUsed(IOUSBController,  18);
+	virtual IOReturn UIMCreateIsochTransfer(IOUSBIsocCommand *command);
+#else
     OSMetaClassDeclareReservedUnused(IOUSBController,  18);
+#endif
+
     OSMetaClassDeclareReservedUnused(IOUSBController,  19);
     
 private:

@@ -663,8 +663,7 @@ AppleUSBHubPort::ResetPort()
         }
 
 #if 1
-		// We should remove this in Leopard.  We can't do it earlier 'cause we need more testing
-        // Check to see if the port is suspended and if so, clear that feature
+		// Check to see if the port is suspended and if so, clear that feature
         //
         err = _hub->GetPortStatus(&status, _portNum);
         if (kIOReturnSuccess != err)
@@ -1130,7 +1129,7 @@ AppleUSBHubPort::AddDeviceResetChangeHandler(UInt16 changeFlags, UInt16 statusFl
             _portDevice->setProperty("non-removable","yes");
        
         // register the NUB
-		USBLog(5, "AppleUSBHubPort[%p]::AddDeviceResetChangeHandler - port %d, calling registerService on device %s", this, _portNum, _portDevice->getName() );
+		USBLog(5, "AppleUSBHubPort[%p]::AddDeviceResetChangeHandler - port %d, calling registerService for device %s", this, _portNum, _portDevice->getName() );
         _portDevice->registerService();
 
     } while(false);

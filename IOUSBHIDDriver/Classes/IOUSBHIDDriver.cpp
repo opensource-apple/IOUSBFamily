@@ -116,6 +116,30 @@ IOUSBHIDDriver::init(OSDictionary *properties)
     return true;
 }
 
+
+
+void
+IOUSBHIDDriver::stop(IOService *  provider)
+{
+	if ( _suspendPortTimer )
+	{
+		if (_workLoop)
+			_workLoop->removeEventSource( _suspendPortTimer );
+		_suspendPortTimer->release();
+		_suspendPortTimer = NULL;
+		_suspendTimeoutInMS= 0;
+	}
+    if (_gate)
+    {
+        if (_workLoop)
+            _workLoop->removeEventSource(_gate);
+        _gate->release();
+        _gate = NULL;
+    }
+}
+
+
+
 //================================================================================================
 //
 //  free
@@ -125,27 +149,12 @@ IOUSBHIDDriver::init(OSDictionary *properties)
 void
 IOUSBHIDDriver::free()
 {
-    if (_gate)
-    {
-        if (_workLoop)
-        {
-			if ( _suspendPortTimer )
-			{
-				_workLoop->removeEventSource( _suspendPortTimer );
-				_suspendPortTimer->release();
-				_suspendPortTimer = NULL;
-				_suspendTimeoutInMS= 0;
-			}
-
-            _workLoop->removeEventSource(_gate);
-            _workLoop->release();
-            _workLoop = NULL;
-        }
-
-        _gate->release();
-        _gate = NULL;
-    }
-
+	if (_workLoop)
+	{
+		_workLoop->release();
+		_workLoop = NULL;
+	}
+		
     //  This needs to be the LAST thing we do, as it disposes of our "fake" member
     //  variables.
     //
@@ -154,8 +163,8 @@ IOUSBHIDDriver::free()
         IOFree(_usbHIDExpansionData, sizeof(IOUSBHIDDriverExpansionData));
         _usbHIDExpansionData = NULL;
     }
-
-super::free();
+	
+	super::free();
 }
 
 
@@ -319,6 +328,8 @@ IOUSBHIDDriver::start(IOService *provider)
 		propertyObj = NULL;
 	}
 	
+	_interfaceNumber = _interface->GetInterfaceNumber();
+	
 	// Check to see if we have a logging property
 	//
 	propertyObj = provider->copyProperty(kUSBHIDReportLoggingLevel);
@@ -362,7 +373,7 @@ IOUSBHIDDriver::start(IOService *provider)
 
 ErrorExit:
 
-        USBError(1, "%s[%p]::start - aborting startup", getName(), this);
+    USBError(1, "%s[%p]::start - aborting startup", getName(), this);
 
     if ( commandGate != NULL )
     {
@@ -422,6 +433,13 @@ IOUSBHIDDriver::message( UInt32 type, IOService * provider,  void * argument )
             _deviceHasBeenDisconnected = FALSE;
 			
             err = RearmInterruptRead();
+			break;
+			
+        case kIOUSBMessagePortHasBeenSuspended:
+            
+            USBLog(3, "%s[%p]: received kIOUSBMessagePortHasBeenSuspended", getName(), this);
+ 			_portSuspended = true;
+			break;
 			
         case kIOUSBMessagePortHasBeenResumed:
 		case kIOUSBMessagePortWasNotSuspended:
@@ -1088,17 +1106,24 @@ IOUSBHIDDriver::InterruptReadHandler(IOReturn status, UInt32 bufferSizeRemaining
             // queue another read.  Otherwise, go check to see if the device is
             // around or not. 
             //
-				
-            if ( !_deviceHasBeenDisconnected && !isInactive() )
+			if ( IsPortSuspended() )
 			{
-				USBLog(3, "%s[%p]::InterruptReadHandler Checking to see if HID device is still connected", getName(), this);
-				IncrementOutstandingIO();
-				thread_call_enter(_deviceDeadCheckThread );
-				
-				// Before requeueing, we need to clear the stall
-				//
-				_interruptPipe->ClearStall();
-				queueAnother = true;						// if the device is really dead, this request will get aborted
+				// If the port is suspended, then we can expect this.  Just ignore the error.
+	            USBLog(4, "%s[%p]::InterruptReadHandler kIOReturnNotResponding error but port is suspended", getName(), this);
+			}
+			else
+			{	
+				if ( !_deviceHasBeenDisconnected && !isInactive() )
+				{
+					USBLog(3, "%s[%p]::InterruptReadHandler Checking to see if HID device is still connected", getName(), this);
+					IncrementOutstandingIO();
+					thread_call_enter(_deviceDeadCheckThread );
+					
+					// Before requeueing, we need to clear the stall
+					//
+					_interruptPipe->ClearStall();
+					queueAnother = true;						// if the device is really dead, this request will get aborted
+				}
 			}
 			break;
             
@@ -1695,6 +1720,11 @@ IOUSBHIDDriver::StartFinalProcessing(void)
     _completion.parameter = (void *)0;
     
     err = RearmInterruptRead();
+	
+	if (err)
+	{
+		USBError(1, "IOUSBHIDDriver[%p]::StartFinalProcessing - err (%p) back from RearmInterruptRead", this, (void*)err);
+	}
 
     return err;
 }
@@ -1840,18 +1870,16 @@ IOUSBHIDDriver::SuspendPort(bool suspendPort, UInt32 timeoutInMS )
 		// If the timeouts are enabled, then cancel them
 		if ( _suspendPortTimer )
 		{
-			if ( _workLoop )
-			{
 				// After this call completes, the action will not be called again.
 				_suspendPortTimer->cancelTimeout();
 				
 				// Remove the event source
-				_workLoop->removeEventSource( _suspendPortTimer );
+				if ( _workLoop )
+					_workLoop->removeEventSource( _suspendPortTimer );
+				
 				_suspendPortTimer->release();
 				_suspendPortTimer = NULL;
 				_suspendTimeoutInMS = 0;
-				
-			}
 		}
 		
 		status = AbortAndSuspend( false );
@@ -1985,12 +2013,12 @@ IOUSBHIDDriver::DecrementOutstandingIO(void)
 {
     if (!_gate)
     {
-	if (!--_outstandingIO && _needToClose)
-	{
-	    USBLog(3, "%s[%p]::DecrementOutstandingIO isInactive = %d, outstandingIO = %ld - closing device", getName(), this, isInactive(), _outstandingIO);
-	    _interface->close(this);
-	}
-	return;
+		if (!--_outstandingIO && _needToClose)
+		{
+			USBLog(3, "%s[%p]::DecrementOutstandingIO isInactive = %d, outstandingIO = %ld - closing device", getName(), this, isInactive(), _outstandingIO);
+			_interface->close(this);
+		}
+		return;
     }
     _gate->runAction(ChangeOutstandingIO, (void*)-1);
 }
@@ -2007,8 +2035,8 @@ IOUSBHIDDriver::IncrementOutstandingIO(void)
 {
     if (!_gate)
     {
-	_outstandingIO++;
-	return;
+		_outstandingIO++;
+		return;
     }
     _gate->runAction(ChangeOutstandingIO, (void*)1);
 }

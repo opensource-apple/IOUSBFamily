@@ -560,7 +560,7 @@ AppleUSBUHCI::UIMRootHubStatusChange(bool abort)
 				
 				if ( !_previousPortRecoveryAttempted[i-1] )
 				{
-					USBLog(2, "AppleUSBUHCI[%p]::UIMRootHubStatusChange  Port %d had a change: 0x%x", this, i, portStatus.changeFlags);
+					USBLog(7, "AppleUSBUHCI[%p]::UIMRootHubStatusChange  Port %d had a change: 0x%x", this, i, portStatus.changeFlags);
 					if ( (portStatus.changeFlags & kHubPortEnabled) and (portStatus.statusFlags & kHubPortConnection) and (portStatus.statusFlags & kHubPortPower) and !(portStatus.statusFlags & kHubPortEnabled) )
 					{
 						// Indicate that we are attempting a recovery
@@ -597,7 +597,7 @@ AppleUSBUHCI::UIMRootHubStatusChange(bool abort)
 	}
 	else
 	{
-		USBLog(3, "AppleUSBUHCI[%p]::UIMRootHubStatusChange - no work to (abort: %d, available: %d)", this, _uhciAvailable, _uhciAvailable);
+		USBLog(7, "AppleUSBUHCI[%p]::UIMRootHubStatusChange - no work to (abort: %d, available: %d)", this, abort, _uhciAvailable);
 	}
     
     // Bitmap is only one byte, so it doesn't need swapping.
@@ -865,6 +865,7 @@ AppleUSBUHCI::RHCreateInterruptTransfer(IOUSBCommand* command)
             _outstandingTrans[index].bufLen = command->GetReqCount();
             _outstandingTrans[index].completion = command->GetUSLCompletion();
             IOUnlock(_intLock);									// Unlock the queue
+
 			// Calculate how long it's been since the last status change and wait until the pollingRate to call the UIMRootHubStatusChange()
 			lastRootHubChangeTime = RHLastPortStatusChanged();
 			
@@ -875,7 +876,7 @@ AppleUSBUHCI::RHCreateInterruptTransfer(IOUSBCommand* command)
 			
 			if ( elapsedTime < kUHCIRootHubPollingInterval )
 			{
-				USBLog(5, "AppleUSBUHCI[%p]::SimulateRootHubInt  Last change was %qd ms ago.  IOSleep'ing for %qd ms",  this, elapsedTime, kUHCIRootHubPollingInterval - elapsedTime );
+				USBLog(5, "AppleUSBUHCI[%p]::SimulateRootHubInt  Last change was %qd ms ago.  IOSleep'ing for %qd ms, _workLoop->inGate = %d",  this, elapsedTime, kUHCIRootHubPollingInterval - elapsedTime, _workLoop->inGate() );
 				IOSleep( kUHCIRootHubPollingInterval - elapsedTime );
 			}
 			
@@ -1133,6 +1134,21 @@ AppleUSBUHCI::RHResetPort(int port)
     return kIOReturnSuccess;
 }
 
+// Reset and enable the port
+IOReturn
+AppleUSBUHCI::RHHoldPortReset(int port)
+{
+    UInt16 value;
+    int i;
+    
+    USBLog(1, "%s[%p]::RHHoldPortReset %d", getName(), this, port);
+    port--; // convert 1-based to 0-based.
+
+    value = ReadPortStatus(port) & kUHCI_PORTSC_MASK;
+    WritePortStatus(port, value | kUHCI_PORTSC_RESET);
+    
+    return kIOReturnSuccess;
+}
 
 
 /* ==== debugging ==== */

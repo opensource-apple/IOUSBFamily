@@ -292,11 +292,11 @@ IOUSBInterface::start(IOService *provider)
 
 ErrorExit:
 
-        if ( _gate != NULL )
-        {
-            _gate->release();
-            _gate = NULL;
-        }
+	if ( _gate != NULL )
+	{
+		_gate->release();
+		_gate = NULL;
+	}
 
     if ( _workLoop != NULL )
     {
@@ -327,6 +327,7 @@ IOUSBInterface::attach(IOService *provider)
 }
 
 
+
 bool 
 IOUSBInterface::finalize(IOOptionBits options)
 {
@@ -341,6 +342,32 @@ IOUSBInterface::finalize(IOOptionBits options)
     return ret;
 }
 
+
+
+void 
+IOUSBInterface::stop( IOService * provider )
+{
+	
+    USBLog(7,"+%s[%p]::stop (provider = %p)", getName(), this, provider);
+	
+    ClosePipes();
+
+	if (_gate)
+	{
+		if (_workLoop)
+			_workLoop->removeEventSource(_gate);
+		_gate->release();
+		_gate = NULL;
+	}
+    
+	super::stop(provider);
+	
+    USBLog(7,"-%s[%p]::stop (provider = %p)", getName(), this, provider);
+	
+}
+
+
+
 void
 IOUSBInterface::free()
 {
@@ -351,18 +378,11 @@ IOUSBInterface::free()
     //
     if (_expansionData)
     {
-        if (_gate)
-        {
-            if (_workLoop)
-            {
-                ret = _workLoop->removeEventSource(_gate);
-                _workLoop->release();
-                _workLoop = NULL;
-            }
-
-            _gate->release();
-            _gate = NULL;
-        }
+		if (_workLoop)
+		{
+			_workLoop->release();
+			_workLoop = NULL;
+		}
 
         IOFree(_expansionData, sizeof(ExpansionData));
         _expansionData = NULL;
@@ -370,6 +390,8 @@ IOUSBInterface::free()
     
     super::free();
 }
+
+
 
 IOReturn
 IOUSBInterface::CallSuperOpen(OSObject *target, void *param1, void *param2, void *param3, void *param4)
@@ -492,9 +514,6 @@ IOUSBInterface::open( IOService *forClient, IOOptionBits options, void *arg )
     bool			res = true;
     IOReturn		error = kIOReturnSuccess;
 	
-    // Check to see if we need to open the driver while holding the gate.  The USB Device Nub should
-    // have the kCallInterfaceOpenWithGate property set.
-    //
     if ( _gate )
     {
         USBLog(6,"%s[%p]::open calling super::open with gate", getName(), this);
@@ -542,14 +561,18 @@ IOUSBInterface::handleOpen( IOService *forClient, IOOptionBits options, void *ar
         USBLog(5, "%s[%p]::handleOpen calling SetAlternateInterface(%d)", getName(), this, altInterface);
         err =  SetAlternateInterface(forClient, altInterface);
         if ( err != kIOReturnSuccess) 
-            USBError(1, "%s[%p]::handleOpen: SetAlternateInterface failed (0x%x)", getName(), this, err);
+		{
+            USBLog(1, "%s[%p]::handleOpen: SetAlternateInterface failed (0x%x)", getName(), this, err);
+		}
         
     }
     else
     {
         err = CreatePipes();
         if ( err != kIOReturnSuccess) 
+		{
             USBError(1, "%s[%p]::handleOpen: CreatePipes failed (0x%x)", getName(), this, err);
+		}
     }
     
     if (err != kIOReturnSuccess)
@@ -566,7 +589,7 @@ void
 IOUSBInterface::close( IOService *forClient, IOOptionBits options)
 {
     IOReturn		error = kIOReturnSuccess;
-    
+
     if ( _gate )
     {
         USBLog(6,"%s[%p]::close calling super::close with gate", getName(), this);
@@ -1177,15 +1200,24 @@ IOUSBInterface::message( UInt32 type, IOService * provider,  void * argument )
     
     switch ( type )
     {
+        case kIOUSBMessagePortHasBeenSuspended:
+            // Forward the message to our clients
+            //
+			USBLog(6, "%s[%p]::message - received kIOUSBMessagePortHasBeenSuspended", getName(), this);
+            messageClients( kIOUSBMessagePortHasBeenSuspended, this, NULL);
+            break;
+			
         case kIOUSBMessagePortHasBeenReset:
             // Forward the message to our clients
             //
-            messageClients( kIOUSBMessagePortHasBeenReset, this, NULL);
+ 			USBLog(6, "%s[%p]::message - received kIOUSBMessagePortHasBeenReset", getName(), this);
+			messageClients( kIOUSBMessagePortHasBeenReset, this, NULL);
             break;
-  
-       case kIOUSBMessagePortHasBeenResumed:
+			
+		case kIOUSBMessagePortHasBeenResumed:
             // Forward the message to our clients
             //
+			USBLog(6, "%s[%p]::message - received kIOUSBMessagePortHasBeenResumed", getName(), this);
             messageClients( kIOUSBMessagePortHasBeenResumed, this, NULL);
             break;
   
@@ -1225,24 +1257,9 @@ IOUSBInterface::didTerminate( IOService * provider, IOOptionBits options, bool *
 	}
 	else
 	{
-		USBError(1, "IOUSBInterface[%p]::didTerminate - not closing device[%p] provider[%p]", this, _device, provider);
+		USBLog(1, "IOUSBInterface[%p]::didTerminate - not closing device[%p] provider[%p]", this, _device, provider);
 	}
 	return true;
-}
-
-
-
-void 
-IOUSBInterface::stop( IOService * provider )
-{
-
-    USBLog(7,"+%s[%p]::stop (provider = %p)", getName(), this, provider);
-
-    ClosePipes();
-    super::stop(provider);
-
-    USBLog(7,"-%s[%p]::stop (provider = %p)", getName(), this, provider);
-
 }
 
 

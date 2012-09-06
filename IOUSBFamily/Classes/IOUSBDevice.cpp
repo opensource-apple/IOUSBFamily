@@ -79,6 +79,7 @@ extern "C" {
 #define _commandGate				_expansionData->_commandGate
 #define _suspendCommand				_expansionData->_suspendCommand
 #define _openInterfaces				_expansionData->_openInterfaces
+#define _resetCommand				_expansionData->_resetCommand
 
 #define kNotifyTimerDelay		30000	// in milliseconds = 30 seconds
 #define kUserLoginDelay			20000	// in milliseconds = 20 seconds
@@ -366,7 +367,7 @@ IOUSBDevice::init(USBDeviceAddress deviceAddress, UInt32 powerAvailable, UInt8 s
     {
 		IOFree(_expansionData, sizeof(ExpansionData));
         _expansionData = NULL;
-        USBError(1, "IOUSBDevice[%p]::init - Error allocating getConfigLock", this);
+        USBLog(1, "IOUSBDevice[%p]::init - Error allocating getConfigLock", this);
         return false;
     }
 	
@@ -453,7 +454,7 @@ IOUSBDevice::free()
 		{
 			if (_openInterfaces->getCount())
 			{
-				USBError(1, "IOUSBDevice[%p]::free - stopping with some open interfaces", this);
+				USBLog(1, "IOUSBDevice[%p]::free - stopping with some open interfaces", this);
 			}
 			else
 			{
@@ -464,7 +465,7 @@ IOUSBDevice::free()
 		
         if ( _getConfigLock )
             IORecursiveLockFree(_getConfigLock);
-				
+		
         if (_workLoop)
         {
             _workLoop->release();
@@ -726,13 +727,13 @@ IOUSBDevice::start( IOService * provider )
 
 ErrorExit:
 		
-	if ( _notifierHandlerTimer )
-	{
-		if ( _workLoop )
-			_workLoop->removeEventSource(_notifierHandlerTimer);
-		_notifierHandlerTimer->release();
-		_notifierHandlerTimer = NULL;
-	}
+		if ( _notifierHandlerTimer )
+		{
+			if ( _workLoop )
+				_workLoop->removeEventSource(_notifierHandlerTimer);
+			_notifierHandlerTimer->release();
+			_notifierHandlerTimer = NULL;
+		}
 	
 	if ( _commandGate )
 	{
@@ -831,7 +832,9 @@ IOUSBDevice::handleOpen(IOService *forClient, IOOptionBits options, void *arg)
 	{
 		USBLog(5, "IOUSBDevice[%p]::handleOpen - [%p] is not an IOUSBInterface", this, forClient);
 		result = super::handleOpen(forClient, options, arg);
+		USBLog(6, "IOUSBDevice[%p]::handleOpen - super::handleOpen returned 0x%x", this, result);
 	}
+	
 	return result;
 }
 
@@ -884,6 +887,7 @@ IOReturn
 IOUSBDevice::ResetDevice()
 {
     UInt32	retries = 0;
+	IOReturn	kr = kIOReturnSuccess;
 	
     if ( _resetInProgress )
     {
@@ -911,21 +915,32 @@ IOUSBDevice::ResetDevice()
     USBLog(5, "+%s[%p] ResetDevice for port %ld", getName(), this, _portNumber );
     thread_call_enter( _doPortResetThread );
 	
-    // Should we do a commandSleep/Wakeup here?
-    //
-    while ( !_portHasBeenReset && retries < 100 )
-    {
-        IOSleep(100);
+	if ( _workLoop->inGate() && _commandGate)
+	{
+		USBLog(3,"%s[%p]::ResetDevice calling commandSleep", getName(), this);
 		
-        if ( isInactive() )
-        {
-            USBLog(3, "+%s[%p] isInactive() while waiting for reset to finish", getName(), this );
-            break;
-        }
-        
-        retries++;
+		_resetCommand = true;
+		kr = _commandGate->commandSleep(&_resetCommand, THREAD_UNINT);
+		_resetCommand = false;
+		USBLog(3,"%s[%p]::ResetDevice  woke up", getName(), this);
+		
+	}
+	else
+	{
+		while ( !_portHasBeenReset && retries < 100 )
+		{
+			IOSleep(100);
+			
+			if ( isInactive() )
+			{
+				USBLog(3, "+%s[%p] isInactive() while waiting for reset to finish", getName(), this );
+				break;
+			}
+			
+			retries++;
+		}
     }
-    
+	
     USBLog(5, "-%s[%p] ResetDevice for port %ld", getName(), this, _portNumber );
 	
     _resetInProgress = false;
@@ -1201,7 +1216,7 @@ IOUSBDevice::GetFullConfigurationDescriptor(UInt8 index)
 				err = GetConfigDescriptor(index, &confDesc, 9);
 				if ( (kIOReturnSuccess != err) && ( kIOReturnOverrun != err ) )
 				{
-					USBError(1, "IOUSBDevice[%p]::GetFullConfigurationDescriptor - Error (%x) getting first %d bytes of config descriptor", this, err, 9);
+					USBLog(1, "IOUSBDevice[%p]::GetFullConfigurationDescriptor - Error (%x) getting first %d bytes of config descriptor", this, err, 9);
 					goto Exit;
 				}
 				
@@ -1212,7 +1227,7 @@ IOUSBDevice::GetFullConfigurationDescriptor(UInt8 index)
 					//
 					if ( !((confDesc.bLength == 9) && (confDesc.bDescriptorType == kUSBConfDesc) && (confDesc.wTotalLength != 0)) )
 					{
-						USBError(1, "IOUSBDevice[%p]::GetFullConfigurationDescriptor - Overrun error and data returned is not correct (%d, %d, %d)", this, temp.bLength, temp.bDescriptorType, USBToHostWord(temp.wTotalLength));
+						USBLog(1, "IOUSBDevice[%p]::GetFullConfigurationDescriptor - Overrun error and data returned is not correct (%d, %d, %d)", this, temp.bLength, temp.bDescriptorType, USBToHostWord(temp.wTotalLength));
 						goto Exit;
 					}
 					USBError(1, "USB Device %s is violating Section 9.3.5 of the USB Specification -- Error in GetConfigDescriptor( wLength = 9)", getName());
@@ -1235,7 +1250,7 @@ IOUSBDevice::GetFullConfigurationDescriptor(UInt8 index)
         
         if(!localConfigPointer)
         {
-            USBError(1, "%s[%p]::GetFullConfigurationDescriptor - unable to get memory buffer (capacity requested: %d)", getName(), this, len);
+            USBLog(1, "%s[%p]::GetFullConfigurationDescriptor - unable to get memory buffer (capacity requested: %d)", getName(), this, len);
             goto Exit;
         }
         
@@ -1243,7 +1258,7 @@ IOUSBDevice::GetFullConfigurationDescriptor(UInt8 index)
         err = GetConfigDescriptor(index, localConfigPointer->getBytesNoCopy(), len);
         if (err) 
         {
-            USBError(1, "%s[%p]::GetFullConfigurationDescriptor - Error (%x) getting full %d bytes of config descriptor", getName(), this, err, len);
+            USBLog(1, "%s[%p]::GetFullConfigurationDescriptor - Error (%x) getting full %d bytes of config descriptor", getName(), this, err, len);
             
             if ( localConfigPointer )
             {
@@ -1295,7 +1310,7 @@ IOUSBDevice::GetDeviceDescriptor(IOUSBDeviceDescriptor *desc, UInt32 size)
     
     if (err)
     {
-        USBError(1,"%s[%p]: Error (0x%x) getting device device descriptor", getName(), this, err);
+        USBLog(1,"%s[%p]: Error (0x%x) getting device device descriptor", getName(), this, err);
     }
 	
     return err;
@@ -1443,7 +1458,7 @@ IOUSBDevice::SetConfiguration(IOService *forClient, UInt8 configNumber, bool sta
 	
     if (err)
     {
-        USBError(1,"%s[%p]: error setting config. err=0x%x", getName(), this, err);
+        USBLog(1,"%s[%p]: error setting config. err=0x%x", getName(), this, err);
 		return err;
     }
 	
@@ -1590,7 +1605,7 @@ IOUSBDevice::SetFeature(UInt8 feature)
 	
     if (err)
     {
-        USBError(1, "%s[%p]: error setting feature (%d). err=0x%x", getName(), this, feature, err);
+        USBLog(1, "%s[%p]: error setting feature (%d). err=0x%x", getName(), this, feature, err);
     }
 	
     return(err);
@@ -2033,7 +2048,7 @@ IOUSBDevice::GetConfiguration(UInt8 *configNumber)
 	
     if (err)
     {
-        USBError(1,"%s[%p]: error getting config. err=0x%x", getName(), this, err);
+        USBLog(1,"%s[%p]: error getting config. err=0x%x", getName(), this, err);
     }
 	
     return(err);
@@ -2059,7 +2074,7 @@ IOUSBDevice::GetDeviceStatus(USBStatus *status)
     err = DeviceRequest(&request, 5000, 0);
 	
     if (err)
-        USBError(1,"%s[%p]: error getting device status. err=0x%x", getName(), this, err);
+        USBLog(1,"%s[%p]: error getting device status. err=0x%x", getName(), this, err);
 	
     return(err);
 }
@@ -2244,7 +2259,18 @@ IOUSBDevice::message( UInt32 type, IOService * provider,  void * argument )
                 IOSleep(50);
             }
             
-            // We should do something if _pipeZero does not exist
+			// If we had set our thread to sleep waiting for the reset to complete, now wake it up
+			//
+			if ( _resetCommand )
+			{
+				USBLog(3,"%s[%p]::message  calling commandWakeUp due to kIOUSBMessagePortHasBeenReset", getName(),this);
+				if (_commandGate)
+					_commandGate->commandWakeup(&_resetCommand,  true);
+				else
+					USBLog(1,"%s[%p]::message  cannot call commandGate->wakeup because there is no gate", getName(),this);
+			}
+
+			// We should do something if _pipeZero does not exist
             //
             if ( _pipeZero && (resetErr == kIOReturnSuccess) )
             {
@@ -2328,16 +2354,18 @@ IOUSBDevice::message( UInt32 type, IOService * provider,  void * argument )
             // as well.  This vaiable should be called _portHasBeenSuspendedOrResumedOrResumed
             //
             _portHasBeenSuspendedOrResumed = true;
-
+			
 			// If we had set our thread to sleep waiting for the suspend to complete, now wake it up
 			//
 			if ( _suspendCommand )
 			{
-					USBLog(3,"%s[%p]::message  calling commandWakeUp due to kIOUSBMessagePortHasBeenResumed", getName(),this);
-					if (_commandGate)
-						_commandGate->commandWakeup(&_suspendCommand,  true);
+				USBLog(3,"%s[%p]::message  calling commandWakeUp due to kIOUSBMessagePortHasBeenResumed", getName(),this);
+				if (_commandGate)
+					_commandGate->commandWakeup(&_suspendCommand,  true);
+				else
+					USBLog(1,"%s[%p]::message  cannot call commandGate->wakeup because there is no gate", getName(),this);
 			}
-            
+				
 			messageClients( kIOUSBMessagePortHasBeenResumed, this, _portNumber);
             break;
 			
@@ -2353,6 +2381,8 @@ IOUSBDevice::message( UInt32 type, IOService * provider,  void * argument )
 				USBLog(3,"%s[%p]::message  calling commandWakeUp due to kIOUSBMessagePortHasBeenSuspended", getName(),this);
 				if (_commandGate)
 					_commandGate->commandWakeup(&_suspendCommand,  true);
+				else
+					USBLog(1,"%s[%p]::message  cannot call commandGate->wakeup because there is no gate", getName(),this);
 			}
 				
 				// Forward the message to our clients
@@ -2390,7 +2420,7 @@ IOUSBDevice::stop( IOService * provider )
 	if ( _commandGate )
 	{
         if ( _workLoop )
-			_workLoop->removeEventSource(_commandGate);
+		_workLoop->removeEventSource(_commandGate);
 		_commandGate->release();
 		_commandGate = NULL;
 	}
@@ -2409,6 +2439,9 @@ IOUSBDevice::willTerminate( IOService * provider, IOOptionBits options )
     // isInactive flag is set, so we really are marked as being done. we will do in here
     // what we used to do in the message method (this happens first)
     USBLog(3, "%s[%p]::willTerminate isInactive = %d", getName(), this, isInactive());
+	
+	if ( _notifierHandlerTimer)
+		_notifierHandlerTimer->cancelTimeout();
 	
     return super::willTerminate(provider, options);
 }
@@ -2922,7 +2955,7 @@ IOUSBDevice::ProcessPortReset()
     _pipeZero = IOUSBPipe::ToEndpoint(&_endpointZero, this, _controller);
     if (!_pipeZero)
     {
-        USBError(1,"%s[%p]::ProcessPortReset DANGER could not recreate pipe Zero after reset", getName(), this);
+        USBLog(1,"%s[%p]::ProcessPortReset DANGER could not recreate pipe Zero after reset", getName(), this);
         err = kIOReturnNoMemory;
     }
 	

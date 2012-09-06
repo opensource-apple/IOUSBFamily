@@ -44,20 +44,29 @@
 #define MICROSECOND		(1)
 #define MILLISECOND		(1000)
 
+/* Convert USBLog to use kprintf debugging */
+#define OHCI_USE_KPRINTF 0
+
+#if OHCI_USE_KPRINTF
+#undef USBLog
+#undef USBError
+void kprintf(const char *format, ...)
+__attribute__((format(printf, 1, 2)));
+#define USBLog( LEVEL, FORMAT, ARGS... )  if ((LEVEL) <= 3) { kprintf( FORMAT "\n", ## ARGS ) ; }
+#define USBError( LEVEL, FORMAT, ARGS... )  { kprintf( FORMAT "\n", ## ARGS ) ; }
+#endif
+
 #ifdef __ppc__
 #define IOSync eieio
 #else
 #define IOSync()
 #endif
 
-extern "C" {
-    extern void delay(int);
-};
-
-struct InterruptTransaction {
+struct InterruptTransaction 
+{
     IOMemoryDescriptor *	buf;
-    UInt32 			bufLen;
-    IOUSBCompletion		completion;
+    UInt32					bufLen;
+    IOUSBCompletion			completion;
 };
 #define kMaxOutstandingTrans 4
 
@@ -152,28 +161,26 @@ private:
 
 protected:
 
-    IOPCIDevice *      					_device;
-    IOMemoryMap *					_deviceBase;
-    IONaturalMemoryCursor * 				_genCursor;
-    IONaturalMemoryCursor * 				_isoCursor;
+    IOPCIDevice *								_device;
+    IOMemoryMap *								_deviceBase;
     AppleOHCIGeneralTransferDescriptorPtr 		_pendingHead;
     AppleOHCIGeneralTransferDescriptorPtr		_pendingTail;
-    UInt16						_vendorID;
-    UInt16						_deviceID;
-    UInt16						_revisionID;
-    UInt32						_errataBits;		// various bits for chip erratas
-    OHCIRegistersPtr					_pOHCIRegisters;	// Pointer to base address of OHCI registers.
-    Ptr							_pHCCA;			// Pointer to HCCA.
-    AppleOHCIIntHead					_pInterruptHead[63];	// ptr to private list of all interrupts heads 			
-    volatile AppleOHCIEndpointDescriptorPtr		_pIsochHead;		// ptr to Isochronous list head
-    volatile AppleOHCIEndpointDescriptorPtr		_pIsochTail;		// ptr to Isochronous list tail
-    volatile AppleOHCIEndpointDescriptorPtr		_pBulkHead;		// ptr to Bulk list
-    volatile AppleOHCIEndpointDescriptorPtr		_pControlHead;		// ptr to Control list
-    volatile AppleOHCIEndpointDescriptorPtr		_pBulkTail;		// ptr to Bulk list
-    volatile AppleOHCIEndpointDescriptorPtr		_pControlTail;		// ptr to Control list
-    volatile AppleOHCIGeneralTransferDescriptorPtr	_pFreeTD;		// list of availabble Trasfer Descriptors
+    UInt16										_vendorID;
+    UInt16										_deviceID;
+    UInt16										_revisionID;
+    UInt32										_errataBits;			// various bits for chip erratas
+    OHCIRegistersPtr							_pOHCIRegisters;		// Pointer to base address of OHCI registers.
+    Ptr											_pHCCA;					// Pointer to HCCA.
+    AppleOHCIIntHead							_pInterruptHead[63];	// ptr to private list of all interrupts heads 			
+    volatile AppleOHCIEndpointDescriptorPtr		_pIsochHead;			// ptr to Isochronous list head
+    volatile AppleOHCIEndpointDescriptorPtr		_pIsochTail;			// ptr to Isochronous list tail
+    volatile AppleOHCIEndpointDescriptorPtr		_pBulkHead;				// ptr to Bulk list
+    volatile AppleOHCIEndpointDescriptorPtr		_pControlHead;			// ptr to Control list
+    volatile AppleOHCIEndpointDescriptorPtr		_pBulkTail;				// ptr to Bulk list
+    volatile AppleOHCIEndpointDescriptorPtr		_pControlTail;			// ptr to Control list
+    volatile AppleOHCIGeneralTransferDescriptorPtr	_pFreeTD;			// list of availabble Trasfer Descriptors
     volatile AppleOHCIIsochTransferDescriptorPtr		_pFreeITD;		// list of availabble Trasfer Descriptors
-    volatile AppleOHCIEndpointDescriptorPtr		_pFreeED;		// list of available Endpoint Descriptors
+    volatile AppleOHCIEndpointDescriptorPtr		_pFreeED;				// list of available Endpoint Descriptors
     volatile AppleOHCIGeneralTransferDescriptorPtr	_pLastFreeTD;		// last of availabble Trasfer Descriptors
     volatile AppleOHCIIsochTransferDescriptorPtr		_pLastFreeITD;		// last of availabble Trasfer Descriptors
     volatile AppleOHCIEndpointDescriptorPtr		_pLastFreeED;		// last of available Endpoint Descriptors
@@ -181,7 +188,6 @@ protected:
     AppleUSBOHCIedMemoryBlock*				_edMBHead;		// head of a linked list of ED memory blocks				
     AppleUSBOHCIgtdMemoryBlock*				_gtdMBHead;		// head of a linked list of GTD memory blocks				
     AppleUSBOHCIitdMemoryBlock*				_itdMBHead;		// head of a linked list of ITD memory blocks				
-    UInt32						_pageSize;		// OS Logical page size
     struct  {
         volatile UInt32	scheduleOverrun;				// updated by the interrupt handler
         volatile UInt32	unrecoverableError;				// updated by the interrupt handler
@@ -480,40 +486,39 @@ public:
     virtual IOReturn UIMCreateInterruptTransfer(IOUSBCommand* command);
 
     // Isoch
-    virtual IOReturn UIMCreateIsochEndpoint(
-            short				functionAddress,
-            short				endpointNumber,
-            UInt32				maxPacketSize,
-            UInt8				direction);
+    virtual IOReturn UIMCreateIsochEndpoint(short				functionAddress,
+											short				endpointNumber,
+											UInt32				maxPacketSize,
+											UInt8				direction);
 
-    virtual IOReturn 		UIMCreateIsochEndpoint(
-                                              short		functionAddress,
-                                              short		endpointNumber,
-                                              UInt32		maxPacketSize,
-                                              UInt8		direction,
-                                              USBDeviceAddress highSpeedHub,
-                                              int      highSpeedPort);
+    virtual IOReturn 		UIMCreateIsochEndpoint(short				functionAddress,
+												   short				endpointNumber,
+												   UInt32				maxPacketSize,
+												   UInt8				direction,
+												   USBDeviceAddress		highSpeedHub,
+												   int					highSpeedPort);
     
-    virtual IOReturn UIMCreateIsochTransfer(
-	short				functionAddress,
-	short				endpointNumber,
-	IOUSBIsocCompletion		completion,
-	UInt8				direction,
-	UInt64				frameStart,
-	IOMemoryDescriptor *		pBuffer,
-	UInt32				frameCount,
-	IOUSBIsocFrame			*pFrames);
+    virtual IOReturn UIMCreateIsochTransfer(short					functionAddress,
+											short					endpointNumber,
+											IOUSBIsocCompletion		completion,
+											UInt8					direction,
+											UInt64					frameStart,
+											IOMemoryDescriptor *	pBuffer,
+											UInt32					frameCount,
+											IOUSBIsocFrame *		pFrames);
 
-    virtual IOReturn UIMCreateIsochTransfer(
-	short				functionAddress,
-	short				endpointNumber,
-	IOUSBIsocCompletion		completion,
-	UInt8				direction,
-	UInt64				frameStart,
-	IOMemoryDescriptor *		pBuffer,
-	UInt32				frameCount,
-	IOUSBLowLatencyIsocFrame	*pFrames,
-        UInt32				updateFrequency);
+    virtual IOReturn UIMCreateIsochTransfer(short						functionAddress,
+											short						endpointNumber,
+											IOUSBIsocCompletion			completion,
+											UInt8						direction,
+											UInt64						frameStart,
+											IOMemoryDescriptor *		pBuffer,
+											UInt32						frameCount,
+											IOUSBLowLatencyIsocFrame *	pFrames,
+											UInt32						updateFrequency);
+
+	// new method
+	virtual IOReturn		UIMCreateIsochTransfer(IOUSBIsocCommand *command);
 
     virtual IOReturn UIMAbortEndpoint(
             short				functionNumber,
@@ -568,6 +573,7 @@ public:
                                         void *param1, void *param2,
                                         void *param3, void *param4);
     virtual void UIMCheckForTimeouts(void);
+	virtual IODMACommand					*GetNewDMACommand();
 
 };
 
