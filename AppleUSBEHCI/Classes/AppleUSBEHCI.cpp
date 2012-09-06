@@ -545,10 +545,14 @@ AppleUSBEHCI::UIMFinalize(void)
     if ( _deviceBase )
         USBLog (3, "AppleUSBEHCI[%p]: @ %lx (%lx)(shutting down HW)", this, (long)_deviceBase->getVirtualAddress(), _deviceBase->getPhysicalAddress());
     
-    // Disable the interrupt delivery
+#if 0
+	// 4930013: JRH - This is a bad thing to do with shared interrupts, and since we turn off interrupts at the source
+	// it should be redundant. Let's stop doing it..
+	// Disable the interrupt delivery
     //
     if ( _workLoop )
         _workLoop->disableAllInterrupts();
+#endif
 	
     // Wait for the interrupts to propagate
     //
@@ -1293,16 +1297,20 @@ AppleUSBEHCI::UIMFinalizeForPowerDown(void)
 {
     int 	i;
     IOReturn	err;
-	
+
     if ( _deviceBase )
         USBLog (3, "AppleUSBEHCI[%p]: @ %lx (%lx)(turning off HW)", this, (long)_deviceBase->getVirtualAddress(), _deviceBase->getPhysicalAddress());
     
     // showRegisters("Before");
     
+#if 0
+	// 4930013: JRH - This is a bad thing to do with shared interrupts, and since we turn off interrupts at the source
+	// it should be redundant. Let's stop doing it..
     // Disable the interrupt delivery
     //
     if ( _workLoop )
         _workLoop->disableAllInterrupts();
+#endif
 	
     // Wait for the interrupts to propagate
     //
@@ -1310,16 +1318,16 @@ AppleUSBEHCI::UIMFinalizeForPowerDown(void)
 	
     if ( _pEHCIRegisters && _device )
     {
-        // If we are NOT being terminated, then talk to the OHCI controller and
-        // set up all the registers to be off
+        // We need to disable all interrupts, stop all list processing, and halt the controller.  We do NOT need
+		// to reset the controller, as we want to keep the ownership bit set to the EHCI controller (rdar://5083325)
         //
         // Disable All EHCI Interrupts
         //
         _pEHCIRegisters->USBIntr = 0x0;
         IOSync();
 		
-        // reset the chip and make sure that all is well
-        _pEHCIRegisters->USBCMD = 0;  			// this sets r/s to stop
+        // This stops all list processing AND sets the run/stop bit to stop.  It does NOT reset the HC
+        _pEHCIRegisters->USBCMD = 0; 
         for (i=0; (i < 100) && !(USBToHostLong(_pEHCIRegisters->USBSTS) & kEHCIHCHaltedBit); i++)
             IOSleep(1);
         if (i >= 100)
@@ -1329,33 +1337,6 @@ AppleUSBEHCI::UIMFinalizeForPowerDown(void)
             goto ErrorExit;
         }
 		_ehciBusState = kEHCIBusStateOff;
-		
-        _pEHCIRegisters->USBCMD = HostToUSBLong(kEHCICMDHCReset);		// set the reset bit
-        for (i=0; (i < 100) && (USBToHostLong(_pEHCIRegisters->USBCMD) & kEHCICMDHCReset); i++)
-            IOSleep(1);
-        if (i >= 100)
-        {
-            USBError(1, "AppleUSBEHCI[%p]::UIMInitializeForPowerUp - could not get chip to come out of reset within 100 ms",  this);
-            err = kIOReturnInternalError;
-            goto ErrorExit;
-        }
-        
-        // Route ports back to companion controller
-        _pEHCIRegisters->ConfigFlag = 0;
-        IOSync();
-		IOSleep(1);
-		if (_errataBits & kErrataNECIncompleteWrite)
-		{
-			UInt32		newValue = 0, count = 0;
-			newValue = USBToHostLong(_pEHCIRegisters->ConfigFlag);
-			while ((count++ < 10) && (newValue != 0))
-			{
-				USBError(1, "EHCI driver: UIMFinalizeForPowerDown - ConfigFlag bit not sticking. Retrying.");
-				_pEHCIRegisters->ConfigFlag = 0;
-				IOSync();
-				newValue = USBToHostLong(_pEHCIRegisters->ConfigFlag);
-			}
-		}
 		
 		// Take away the controllers ability be a bus master.
         //

@@ -2079,7 +2079,8 @@ AppleUSBUHCI::AddIsochFramesToSchedule(IOUSBControllerIsochEndpoint* pEP)
 		}
 		else
 		{
-			USBError(1, "AppleUSBUHCI[%p]::AddIsochFramesToSchedule - expected frame (%qd) and see frame (%qd) - should do something here!!", this, currFrame, pTD->_frameNumber);
+			// Can't log so comment this out
+			// USBError(1, "AppleUSBUHCI[%p]::AddIsochFramesToSchedule - expected frame (%qd) and see frame (%qd) - should do something here!!", this, currFrame, pTD->_frameNumber);
 		}
 		currFrame++;
 		pEP->inSlot = nextSlot;

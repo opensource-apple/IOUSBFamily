@@ -1498,7 +1498,8 @@ AppleUSBHubPort::DefaultOverCrntChangeHandler(UInt16 changeFlags, UInt16 statusF
 
     if ( (err == kIOReturnSuccess) && (portStatus.changeFlags != 0x1f) )
     {
-        if ( (portStatus.statusFlags & kHubPortOverCurrent))
+		// check to see if either the overcurrent status is on or the port power status is off
+        if ( (portStatus.statusFlags & kHubPortOverCurrent) || ~(portStatus.statusFlags & kHubPortPower))
         {
             USBLog(1, "AppleUSBHubPort[%p]::DefaultOverCrntChangeHandler. OverCurrent condition in Port %d", this,  _portNum );
             hubDescriptor = _hub->GetCachedHubDescriptor();

@@ -473,7 +473,7 @@ IOUSBDeviceUserClient::ReqComplete(void *obj, void *param, IOReturn res, UInt32 
 	pb->fMem->release();
     }
     if (!me->fDead)
-	sendAsyncResult(pb->fAsyncRef, res, args, 1);
+		sendAsyncResult(pb->fAsyncRef, res, args, 1);
 
     IOFree(pb, sizeof(*pb));
     me->DecrementOutstandingIO();
@@ -1163,17 +1163,22 @@ IOUSBDeviceUserClient::clientClose( void )
 	{
 		if ( fOutstandingIO == 0 )
 		{
-			USBLog(6, "+%s[%p]::clientClose closing provider", getName(), this);
-			if ( fOwner )
+			USBLog(6, "+%s[%p]::clientClose closing provider, setting fNeedToClose to false", getName(), this);
+			if ( fOwner && fOwner->isOpen(this) )
 			{
 				// Since this is call that tells us that our user space client has gone away, we can
 				// close our provider.  We don't set it to NULL because the IOKit object representing
 				// it has not gone away.  That will come in thru did/willTerminate.  Also, we should
 				// be checking whether fOwner was open before closing it, but we will do that later.
 				fOwner->close(this);
+				fNeedToClose = false;
+
 			}
 			if ( fDead) 
+			{
+				fDead = false;
 				release();
+			}
 		}
 		else
 		{
@@ -1313,11 +1318,12 @@ IOUSBDeviceUserClient::didTerminate( IOService * provider, IOOptionBits options,
     // hold on to the device and IOKit will terminate us when we close it later
     USBLog(6, "%s[%p]::didTerminate isInactive = %d, outstandingIO = %ld", getName(), this, isInactive(), fOutstandingIO);
 
-    if ( fOwner && fOwner->isOpen() )
+    if ( fOwner && fOwner->isOpen(this) )
     {
         if ( fOutstandingIO == 0 )
 		{
             fOwner->close(this);
+			fNeedToClose = false;
 			if ( isInactive() )
 				fOwner = NULL;
 		}
@@ -1367,15 +1373,19 @@ IOUSBDeviceUserClient::DecrementOutstandingIO(void)
 	if (!--fOutstandingIO && fNeedToClose)
 	{
 	    USBLog(3, "%s[%p]::DecrementOutstandingIO isInactive = %d, outstandingIO = %ld - closing device", getName(), this, isInactive(), fOutstandingIO);
-			if ( fOwner )
+			if ( fOwner && fOwner->isOpen(this))
 			{
 				fOwner->close(this);
+				fNeedToClose = false;
 				if ( isInactive() )
 					fOwner = NULL;
 			}
 			
             if ( fDead) 
+			{
+				fDead = false;
 				release();
+			}
 	}
 	return;
     }
@@ -1418,15 +1428,19 @@ IOUSBDeviceUserClient::ChangeOutstandingIO(OSObject *target, void *param1, void 
 			{
 				USBLog(6, "%s[%p]::ChangeOutstandingIO isInactive = %d, outstandingIO = %ld - closing device", me->getName(), me, me->isInactive(), me->fOutstandingIO);
 				
-				if (me->fOwner) 
+				if (me->fOwner && me->fOwner->isOpen(me)) 
 				{
 					me->fOwner->close(me);
+					me->fNeedToClose = false;
 					if ( me->isInactive() )
 						me->fOwner = NULL;
 				}
 				
                 if ( me->fDead) 
+				{
+					me->fDead = false;
 					me->release();
+				}
 			}
 			break;
 			

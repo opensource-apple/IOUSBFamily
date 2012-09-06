@@ -224,6 +224,7 @@ AppleEHCIIsochTransferDescriptor::UpdateFrameList(AbsoluteTime timeStamp)
     int								i,j;
 	UInt16							*pActCount;
 	UInt8							framesInTD;
+	UInt32							hsInterval;
 	
     ret = _pEndpoint->accumulatedStatus;
 	
@@ -234,7 +235,8 @@ AppleEHCIIsochTransferDescriptor::UpdateFrameList(AbsoluteTime timeStamp)
 		return kIOReturnSuccess;
 	
     pLLFrames = (IOUSBLowLatencyIsocFrame*)_pFrames;
-    for(i=0, j=0; i < 8; i+= _pEndpoint->interval, j++)
+	hsInterval = (1 << (_pEndpoint->interval - 1));
+    for(i=0, j=0; i < 8; i+= hsInterval, j++)
     {
 		if (!framesInTD)
 			break;

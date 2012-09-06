@@ -1564,6 +1564,7 @@ AppleUSBEHCI::UIMCreateBulkTransfer(short					functionAddress,
 
 
 
+// validPollingRate - for INTERRUPT endpoints, not for Isoch
 UInt16
 AppleUSBEHCI::validatePollingRate(short rawPollingRate,  short speed, int *offset, UInt16 *bytesAvailable)
 {
@@ -1991,12 +1992,11 @@ AppleUSBEHCI::UIMCreateIsochEndpoint(short					functionAddress,
     {
         // Use a UInt16 to keep track of isoc bandwidth, then you can use
         // a pointer to it or to hiPtr->bandwidthAvailable for full speed.
-		if ((interval == 0) || (interval >= 128))
+		if ((interval == 0) || (interval > 16))
 		{
 			USBError(1, "AppleUSBEHCI[%p]::UIMCreateIsochEndpoint: bad interval %d", this, interval);
 			return kIOReturnBadArgument;
 		}
-
     }
     else
     {
@@ -2122,7 +2122,7 @@ AppleUSBEHCI::UIMCreateIsochEndpoint(short					functionAddress,
 		USBLog(5,"AppleUSBEHCI[%p]::UIMCreateIsochEndpoint high speed 2 size %ld, mult %d: %d", this, maxPacketSize, pEP->mult, pEP->oneMPS);
 	}
     pEP->inSlot = kEHCIPeriodicListEntries+1;
-	pEP->interval = interval;
+	pEP->interval = interval;										// note that this is still the RAW interval
 	pEP->hiPtr = hiPtr;
 	
 	
@@ -2941,10 +2941,10 @@ AppleUSBEHCI::CreateHSIsochTransfer(AppleEHCIIsochEndpoint * pEP, IOUSBIsocComma
 	UInt32								numSegments;
 	UInt32								transfersPerTD;
 	UInt32								baseTransferIndex;
-	UInt32								epInterval;
+	UInt32								hsInterval;
 	IOReturn							status;
 	
-	epInterval = pEP->interval;
+	hsInterval = (1 << (pEP->interval - 1));
     transferOffset = 0;
 	
     // Each frame in the frameList (either "pFrames" or "pLLFrames",
@@ -2968,19 +2968,19 @@ AppleUSBEHCI::CreateHSIsochTransfer(AppleEHCIIsochEndpoint * pEP, IOUSBIsocComma
 	// or 32, or 1024 -- effectively, you've got 1 active transfer in
 	// whatever USB frame that transfer happens to "land on".  In that case, we need to 
 	// just update the USB Frame # of the TD (the frameNumberStart) as well as the endpoints
-	// frameNumberStart to advance by bInterval / 8 frames.  We also need to then set the epInterval to 8.
+	// frameNumberStart to advance by bInterval / 8 frames.  We also need to then set the hsInterval to 8.
 
-	transfersPerTD = (epInterval >= 8 ? 1 : (8/epInterval));
-	frameNumberIncrease = (epInterval <= 8 ? 1 : epInterval/8);
+	transfersPerTD = (hsInterval >= 8 ? 1 : (8/hsInterval));
+	frameNumberIncrease = (hsInterval <= 8 ? 1 : hsInterval/8);
 	
 	USBLog(7,"AppleUSBEHCI[%p]::CreateHSIsochTransfer  transfersPerTD will be %ld, frameNumberIncrease = %ld", this, transfersPerTD, frameNumberIncrease);
 	
 	if ( frameNumberIncrease > 1 )
 	{
-		// Now that we have a frameNumberIncrease, set the epInterval to 8 so that our calculations are the same as 
+		// Now that we have a frameNumberIncrease, set the hsInterval to 8 so that our calculations are the same as 
 		// if we had an interval of 8
 		//
-		epInterval = 8;		
+		hsInterval = 8;		
 	}
 	
     // Format all the TDs, attach them to the pseudo endpoint. 
@@ -3003,7 +3003,7 @@ AppleUSBEHCI::CreateHSIsochTransfer(AppleEHCIIsochEndpoint * pEP, IOUSBIsocComma
 	if (transferCount % transfersPerTD != 0)
 	{
 	  USBLog(3,"AppleUSBEHCI[%p]::CreateHSIsochTransfer Isoch -- incomplete final TD in transfer, command->GetNumFrames() is %d, pEP->Interval is %d and so transfersPerTD is %d", 
-			 this, (int ) command->GetNumFrames(), (int ) epInterval, (int ) transfersPerTD);
+			 this, (int ) command->GetNumFrames(), (int ) hsInterval, (int ) transfersPerTD);
 	  return kIOReturnBadArgument;
 	}
 
@@ -3102,7 +3102,7 @@ AppleUSBEHCI::CreateHSIsochTransfer(AppleEHCIIsochEndpoint * pEP, IOUSBIsocComma
 			
 			trLen = (lowLatency ? pLLFrames[baseTransferIndex + transfer].frReqCount : pFrames[baseTransferIndex + transfer].frReqCount);
 			
-			USBLog(7, "AppleUSBEHCI[%p]::CreateHSIsochTransfer - baseTransferIndex: %ld, microFrame: %d, frameIndex: %ld, interval %ld", this, baseTransferIndex, (int ) transfer, baseTransferIndex + transfer, epInterval);
+			USBLog(7, "AppleUSBEHCI[%p]::CreateHSIsochTransfer - baseTransferIndex: %ld, microFrame: %d, frameIndex: %ld, interval %ld", this, baseTransferIndex, (int ) transfer, baseTransferIndex + transfer, hsInterval);
 			USBLog(7, "AppleUSBEHCI[%p]::CreateHSIsochTransfer - forming transaction length (%ld), pageOffset (0x%lx), page (%ld)", this, trLen, pageOffset, page);
 			
 			*transactionPtr = HostToUSBLong(kEHCI_ITDStatus_Active |  (trLen<< kEHCI_ITDTr_LenPhase) | 
@@ -3110,7 +3110,7 @@ AppleUSBEHCI::CreateHSIsochTransfer(AppleEHCIIsochEndpoint * pEP, IOUSBIsocComma
 			
 			// Advance to the next transacton element, which depends on the interval
 			//
-			transactionPtr += epInterval;
+			transactionPtr += hsInterval;
 			
 			// Adjust the page and pageOffset for the next transaction
 			pageOffset += trLen;
@@ -3121,10 +3121,10 @@ AppleUSBEHCI::CreateHSIsochTransfer(AppleEHCIIsochEndpoint * pEP, IOUSBIsocComma
 			}
 		}
 
-		// Now, set the IOC bit for the last transaction in this TD. Note that we index by minus epInterval
+		// Now, set the IOC bit for the last transaction in this TD. Note that we index by minus hsInterval
 		// to reach the transaction that had a TD
 		//
-		transactionPtr[-epInterval] |= HostToUSBLong(kEHCI_ITDTr_IOC);
+		transactionPtr[-hsInterval] |= HostToUSBLong(kEHCI_ITDTr_IOC);
 
 		// Finish updating the other fields in the TD
 		//

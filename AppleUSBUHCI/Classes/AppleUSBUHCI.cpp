@@ -451,7 +451,13 @@ AppleUSBUHCI::UIMFinalize()
     // Stop and suspend controller.
     SuspendController();
     
+#if 0
+	// 4930013: JRH - This is a bad thing to do with shared interrupts, and since we turn off interrupts at the source
+	// it should be redundant. Let's stop doing it..
+    // Disable the interrupt delivery
+    //
     _workLoop->disableAllInterrupts();
+#endif
     
     if (!isInactive()) 
 	{

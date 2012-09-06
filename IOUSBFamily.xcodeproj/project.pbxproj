@@ -33,7 +33,7 @@
 	<key>CFBundleExecutable</key>
 	<string>USB Prober</string>
 	<key>CFBundleGetInfoString</key>
-	<string>2.5.0, Copyright © 2002-2006 Apple Computer Inc., All Rights Reserved</string>
+	<string>2.7.5, Copyright © 2002-2007 Apple Inc., All Rights Reserved</string>
 	<key>CFBundleIconFile</key>
 	<string>USBProberIcon.icns</string>
 	<key>CFBundleIdentifier</key>
@@ -45,11 +45,11 @@
 	<key>CFBundlePackageType</key>
 	<string>APPL</string>
 	<key>CFBundleShortVersionString</key>
-	<string>2.5.0</string>
+	<string>2.7.5</string>
 	<key>CFBundleSignature</key>
 	<string>USBP</string>
 	<key>CFBundleVersion</key>
-	<string>2.5.0</string>
+	<string>2.7.5</string>
 	<key>NSMainNibFile</key>
 	<string>MainMenu</string>
 	<key>NSPrincipalClass</key>
@@ -116,7 +116,6 @@
 		023C1AC6008267027F000001 /* IOUSBRootHubDevice.h in CopyFiles */ = {isa = PBXBuildFile; fileRef = 0179BA3DFFBA18947F000001 /* IOUSBRootHubDevice.h */; };
 		0264FBB1009621D87F000001 /* IOUSBHub.h in Headers */ = {isa = PBXBuildFile; fileRef = 0264FBB0009621D87F000001 /* IOUSBHub.h */; };
 		029D485EFFC9866C7F000001 /* IOUSBDeviceUserClient.h in Headers */ = {isa = PBXBuildFile; fileRef = 029D485DFFC9866C7F000001 /* IOUSBDeviceUserClient.h */; };
-		029D4860FFC987587F000001 /* IOUSBDeviceUserClient.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 029D485FFFC987587F000001 /* IOUSBDeviceUserClient.cpp */; settings = {ATTRIBUTES = (); }; };
 		0319826CFFB38CAB7F000001 /* IOUSBIUnknown.h in Headers */ = {isa = PBXBuildFile; fileRef = 0319826BFFB38CAB7F000001 /* IOUSBIUnknown.h */; settings = {ATTRIBUTES = (); }; };
 		0319826FFFB390817F000001 /* IOUSBDeviceClass.h in Headers */ = {isa = PBXBuildFile; fileRef = 0319826EFFB390817F000001 /* IOUSBDeviceClass.h */; };
 		03198271FFB391BC7F000001 /* IOUSBInterfaceClass.h in Headers */ = {isa = PBXBuildFile; fileRef = 03198270FFB391BC7F000001 /* IOUSBInterfaceClass.h */; };
@@ -129,7 +128,6 @@
 		19580DCAFFBCA3ED7F000001 /* IOUSBHIDDriver.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 19580DC3FFBCA3ED7F000001 /* IOUSBHIDDriver.cpp */; settings = {ATTRIBUTES = (); }; };
 		19580DE6FFBCAF317F000001 /* AppleUSBMergeNub.h in Headers */ = {isa = PBXBuildFile; fileRef = 19580DDEFFBCAF317F000001 /* AppleUSBMergeNub.h */; };
 		19580DE7FFBCAF317F000001 /* AppleUSBMergeNub.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 19580DE0FFBCAF317F000001 /* AppleUSBMergeNub.cpp */; settings = {ATTRIBUTES = (); }; };
-		3A29FAF1FFD21A737F000001 /* IOUSBInterfaceUserClient.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 3A29FAF0FFD21A737F000001 /* IOUSBInterfaceUserClient.cpp */; settings = {ATTRIBUTES = (); }; };
 		3A29FAF2FFD21AF97F000001 /* IOUSBInterfaceUserClient.h in Headers */ = {isa = PBXBuildFile; fileRef = 3A29FAEEFFD204217F000001 /* IOUSBInterfaceUserClient.h */; };
 		3E03401F04F5D97A00AA223D /* KLog.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 3E03401704F5D97A00AA223D /* KLog.cpp */; };
 		3E03402004F5D97A00AA223D /* KLog.h in Headers */ = {isa = PBXBuildFile; fileRef = 3E03401804F5D97A00AA223D /* KLog.h */; };
@@ -147,6 +145,8 @@
 		3E1BE400064C1FC50051240E /* IOUSBDeviceUserClient.h in CopyFiles */ = {isa = PBXBuildFile; fileRef = 029D485DFFC9866C7F000001 /* IOUSBDeviceUserClient.h */; };
 		3E1BE52D064C2F800051240E /* IOUSBInterfaceUserClient.h in CopyFiles */ = {isa = PBXBuildFile; fileRef = 3A29FAEEFFD204217F000001 /* IOUSBInterfaceUserClient.h */; };
 		3E3A39C7065940A500C8D91E /* InfoPlist.strings in Resources */ = {isa = PBXBuildFile; fileRef = 3E3A39C5065940A500C8D91E /* InfoPlist.strings */; };
+		3E3DCD8C0BBD50E200B227B4 /* IOUSBDeviceUserClient.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 029D485FFFC987587F000001 /* IOUSBDeviceUserClient.cpp */; };
+		3E3DCD8F0BBD50EF00B227B4 /* IOUSBInterfaceUserClient.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 3A29FAF0FFD21A737F000001 /* IOUSBInterfaceUserClient.cpp */; };
 		3E43121504587E2900000164 /* InfoPlist.strings in Resources */ = {isa = PBXBuildFile; fileRef = 3E43121404587E2900000164 /* InfoPlist.strings */; };
 		3E652E5904F5261F00C1BD6F /* clean.tiff in Resources */ = {isa = PBXBuildFile; fileRef = 3E652E5504F5261F00C1BD6F /* clean.tiff */; };
 		3E652E5A04F5261F00C1BD6F /* reload.tiff in Resources */ = {isa = PBXBuildFile; fileRef = 3E652E5604F5261F00C1BD6F /* reload.tiff */; };
@@ -329,7 +329,7 @@
 	<key>CFBundleExecutable</key>
 	<string>AppleUSBOHCI</string>
 	<key>CFBundleGetInfoString</key>
-	<string>2.6.5, Copyright © 2000-2006 Apple Computer Inc., All Rights Reserved</string>
+	<string>2.7.5, Copyright © 2000-2007 Apple Inc., All Rights Reserved</string>
 	<key>CFBundleIconFile</key>
 	<string></string>
 	<key>CFBundleIdentifier</key>
@@ -341,11 +341,11 @@
 	<key>CFBundlePackageType</key>
 	<string>KEXT</string>
 	<key>CFBundleShortVersionString</key>
-	<string>2.6.5</string>
+	<string>2.7.5</string>
 	<key>CFBundleSignature</key>
 	<string>????</string>
 	<key>CFBundleVersion</key>
-	<string>2.6.5</string>
+	<string>2.7.5</string>
 	<key>IOKitPersonalities</key>
 	<dict>
 		<key>AppleUSBOHCI</key>
@@ -422,7 +422,7 @@
 	<key>CFBundleExecutable</key>
 	<string>IOUSBFamily</string>
 	<key>CFBundleGetInfoString</key>
-	<string>2.6.5, Copyright © 2000-2006 Apple Computer Inc., All Rights Reserved</string>
+	<string>2.7.5, Copyright © 2000-2007 Apple Inc., All Rights Reserved</string>
 	<key>CFBundleIconFile</key>
 	<string></string>
 	<key>CFBundleIdentifier</key>
@@ -434,11 +434,11 @@
 	<key>CFBundlePackageType</key>
 	<string>KEXT</string>
 	<key>CFBundleShortVersionString</key>
-	<string>2.6.5</string>
+	<string>2.7.5</string>
 	<key>CFBundleSignature</key>
 	<string>????</string>
 	<key>CFBundleVersion</key>
-	<string>2.6.5</string>
+	<string>2.7.5</string>
 	<key>IOKitPersonalities</key>
 	<dict/>
 	<key>OSBundleCompatibleVersion</key>
@@ -483,7 +483,7 @@
 	<key>CFBundleExecutable</key>
 	<string>AppleUSBHub</string>
 	<key>CFBundleGetInfoString</key>
-	<string>2.6.5, Copyright © 2000-2006 Apple Computer Inc., All Rights Reserved</string>
+	<string>2.7.5, Copyright © 2000-2007 Apple Inc., All Rights Reserved</string>
 	<key>CFBundleIconFile</key>
 	<string></string>
 	<key>CFBundleIdentifier</key>
@@ -495,11 +495,11 @@
 	<key>CFBundlePackageType</key>
 	<string>KEXT</string>
 	<key>CFBundleShortVersionString</key>
-	<string>2.6.5</string>
+	<string>2.7.5</string>
 	<key>CFBundleSignature</key>
 	<string>????</string>
 	<key>CFBundleVersion</key>
-	<string>2.6.5</string>
+	<string>2.7.5</string>
 	<key>IOKitPersonalities</key>
 	<dict>
 		<key>AppleUSBHub0</key>
@@ -641,7 +641,7 @@
 	<key>CFBundleExecutable</key>
 	<string>IOUSBUserClient</string>
 	<key>CFBundleGetInfoString</key>
-	<string>2.7.0, Copyright © 2000-2006 Apple Computer Inc., All Rights Reserved</string>
+	<string>2.7.6, Copyright © 2000-2007 Apple Inc., All Rights Reserved</string>
 	<key>CFBundleIconFile</key>
 	<string></string>
 	<key>CFBundleIdentifier</key>
@@ -653,11 +653,11 @@
 	<key>CFBundlePackageType</key>
 	<string>KEXT</string>
 	<key>CFBundleShortVersionString</key>
-	<string>2.7.0</string>
+	<string>2.7.6</string>
 	<key>CFBundleSignature</key>
 	<string>????</string>
 	<key>CFBundleVersion</key>
-	<string>2.7.0</string>
+	<string>2.7.6</string>
 	<key>IOKitPersonalities</key>
 	<dict>
 		<key>IOUSBDeviceUserClientInit</key>
@@ -666,8 +666,8 @@
 			<string>com.apple.iokit.IOUSBUserClient</string>
 			<key>IOClass</key>
 			<string>IOUSBUserClientInit</string>
-			<key>IOMatchCategory</key>
-			<string>IOUSBUserClientInit</string>
+			<key>IOProbeScore</key>
+			<integer>9999</integer>
 			<key>IOProviderClass</key>
 			<string>IOUSBDevice</string>
 			<key>IOProviderMergeProperties</key>
@@ -680,6 +680,12 @@
 				<key>IOUserClientClass</key>
 				<string>IOUSBDeviceUserClient</string>
 			</dict>
+			<key>bcdDevice</key>
+			<string>*</string>
+			<key>idProduct</key>
+			<string>*</string>
+			<key>idVendor</key>
+			<string>*</string>
 		</dict>
 		<key>IOUSBInterfaceUserClientInit</key>
 		<dict>
@@ -687,8 +693,8 @@
 			<string>com.apple.iokit.IOUSBUserClient</string>
 			<key>IOClass</key>
 			<string>IOUSBUserClientInit</string>
-			<key>IOMatchCategory</key>
-			<string>IOUSBUserClientInit</string>
+			<key>IOProbeScore</key>
+			<integer>9999</integer>
 			<key>IOProviderClass</key>
 			<string>IOUSBInterface</string>
 			<key>IOProviderMergeProperties</key>
@@ -701,6 +707,16 @@
 				<key>IOUserClientClass</key>
 				<string>IOUSBInterfaceUserClient</string>
 			</dict>
+			<key>bConfigurationValue</key>
+			<string>*</string>
+			<key>bInterfaceNumber</key>
+			<string>*</string>
+			<key>bcdDevice</key>
+			<string>*</string>
+			<key>idProduct</key>
+			<string>*</string>
+			<key>idVendor</key>
+			<string>*</string>
 		</dict>
 	</dict>
 	<key>OSBundleCompatibleVersion</key>
@@ -712,6 +728,8 @@
 		<key>com.apple.kernel.libkern</key>
 		<string>6.0</string>
 	</dict>
+	<key>OSBundleRequired</key>
+	<string>Root</string>
 </dict>
 </plist>
 ";
@@ -740,7 +758,7 @@
 	<key>CFBundleExecutable</key>
 	<string>IOUSBLib</string>
 	<key>CFBundleGetInfoString</key>
-	<string>2.6.0, Copyright © 2000-2006 Apple Computer Inc., All Rights Reserved</string>
+	<string>2.7.5, Copyright © 2000-2007 Apple Inc., All Rights Reserved</string>
 	<key>CFBundleIconFile</key>
 	<string></string>
 	<key>CFBundleIdentifier</key>
@@ -752,11 +770,11 @@
 	<key>CFBundlePackageType</key>
 	<string>BNDL</string>
 	<key>CFBundleShortVersionString</key>
-	<string>2.6.0</string>
+	<string>2.7.5</string>
 	<key>CFBundleSignature</key>
 	<string>????</string>
 	<key>CFBundleVersion</key>
-	<string>2.6.0</string>
+	<string>2.7.5</string>
 	<key>CFPlugInDynamicRegisterFunction</key>
 	<string></string>
 	<key>CFPlugInDynamicRegistration</key>
@@ -806,7 +824,7 @@
 	<key>CFBundleExecutable</key>
 	<string>IOUSBHIDDriver</string>
 	<key>CFBundleGetInfoString</key>
-	<string>2.6.5, Copyright © 2000-2006 Apple Computer Inc., All Rights Reserved</string>
+	<string>2.7.5, Copyright © 2000-2007 Apple Inc., All Rights Reserved</string>
 	<key>CFBundleIconFile</key>
 	<string></string>
 	<key>CFBundleIdentifier</key>
@@ -818,11 +836,11 @@
 	<key>CFBundlePackageType</key>
 	<string>KEXT</string>
 	<key>CFBundleShortVersionString</key>
-	<string>2.6.5</string>
+	<string>2.7.5</string>
 	<key>CFBundleSignature</key>
 	<string>????</string>
 	<key>CFBundleVersion</key>
-	<string>2.6.5</string>
+	<string>2.7.5</string>
 	<key>IOKitPersonalities</key>
 	<dict>
 		<key>Generic Keyboard</key>
@@ -883,7 +901,7 @@
 	<key>CFBundleExecutable</key>
 	<string>AppleUSBMergeNub</string>
 	<key>CFBundleGetInfoString</key>
-	<string>2.6.0, Copyright © 2000-2006 Apple Computer Inc., All Rights Reserved</string>
+	<string>2.7.5, Copyright © 2000-2007 Apple Computer Inc., All Rights Reserved</string>
 	<key>CFBundleIconFile</key>
 	<string></string>
 	<key>CFBundleIdentifier</key>
@@ -895,11 +913,11 @@
 	<key>CFBundlePackageType</key>
 	<string>KEXT</string>
 	<key>CFBundleShortVersionString</key>
-	<string>2.6.0</string>
+	<string>2.7.5</string>
 	<key>CFBundleSignature</key>
 	<string>????</string>
 	<key>CFBundleVersion</key>
-	<string>2.6.0</string>
+	<string>2.7.5</string>
 	<key>IOKitPersonalities</key>
 	<dict>
 		<key>ATEC 7in1 ExpressCard</key>
@@ -1213,6 +1231,24 @@
 			<key>idVendor</key>
 			<integer>1041</integer>
 		</dict>
+		<key>Camera2</key>
+		<dict>
+			<key>CFBundleIdentifier</key>
+			<string>com.apple.driver.AppleUSBMergeNub</string>
+			<key>IOClass</key>
+			<string>AppleUSBMergeNub</string>
+			<key>IOProviderClass</key>
+			<string>IOUSBDevice</string>
+			<key>IOProviderMergeProperties</key>
+			<dict>
+				<key>kSuspendPort</key>
+				<true/>
+			</dict>
+			<key>idProduct</key>
+			<integer>34050</integer>
+			<key>idVendor</key>
+			<integer>1452</integer>
+		</dict>
 		<key>Digby ExpressCard</key>
 		<dict>
 			<key>CFBundleIdentifier</key>
@@ -1248,6 +1284,24 @@
 			<integer>16</integer>
 			<key>idVendor</key>
 			<integer>2284</integer>
+		</dict>
+		<key>EX-HC34 ExpressCard Reader</key>
+		<dict>
+			<key>CFBundleIdentifier</key>
+			<string>com.apple.driver.AppleUSBMergeNub</string>
+			<key>IOClass</key>
+			<string>AppleUSBMergeNub</string>
+			<key>IOProviderClass</key>
+			<string>IOUSBDevice</string>
+			<key>IOProviderMergeProperties</key>
+			<dict>
+				<key>ExpressCardCantWake</key>
+				<true/>
+			</dict>
+			<key>idProduct</key>
+			<integer>11008</integer>
+			<key>idVendor</key>
+			<integer>21930</integer>
 		</dict>
 		<key>FX2LP</key>
 		<dict>
@@ -1441,6 +1495,24 @@
 			<key>idVendor</key>
 			<integer>1507</integer>
 		</dict>
+		<key>SIIG 2-port Express Card</key>
+		<dict>
+			<key>CFBundleIdentifier</key>
+			<string>com.apple.driver.AppleUSBMergeNub</string>
+			<key>IOClass</key>
+			<string>AppleUSBMergeNub</string>
+			<key>IOProviderClass</key>
+			<string>IOUSBDevice</string>
+			<key>IOProviderMergeProperties</key>
+			<dict>
+				<key>ExpressCardCantWake</key>
+				<true/>
+			</dict>
+			<key>idProduct</key>
+			<integer>90</integer>
+			<key>idVendor</key>
+			<integer>1033</integer>
+		</dict>
 		<key>Sony UMH-U09 ExpressCard</key>
 		<dict>
 			<key>CFBundleIdentifier</key>
@@ -1590,7 +1662,7 @@
 	<key>CFBundleExecutable</key>
 	<string>AppleUSBUHCI</string>
 	<key>CFBundleGetInfoString</key>
-	<string>2.7.0, Copyright © 2004-2006 Apple Computer Inc., All Rights Reserved</string>
+	<string>2.7.5, Copyright © 2004-2006 Apple Inc., All Rights Reserved</string>
 	<key>CFBundleIconFile</key>
 	<string></string>
 	<key>CFBundleIdentifier</key>
@@ -1602,11 +1674,11 @@
 	<key>CFBundlePackageType</key>
 	<string>KEXT</string>
 	<key>CFBundleShortVersionString</key>
-	<string>2.7.0</string>
+	<string>2.7.5</string>
 	<key>CFBundleSignature</key>
 	<string>????</string>
 	<key>CFBundleVersion</key>
-	<string>2.7.0</string>
+	<string>2.7.5</string>
 	<key>IOKitPersonalities</key>
 	<dict>
 		<key>AppleUSBUHCI</key>
@@ -1665,7 +1737,7 @@
 	<key>CFBundleExecutable</key>
 	<string>IOUSBCompositeDriver</string>
 	<key>CFBundleGetInfoString</key>
-	<string>2.6.5, Copyright © 2000-2006 Apple Computer Inc., All Rights Reserved</string>
+	<string>2.7.5, Copyright © 2000-2007 Apple Inc., All Rights Reserved</string>
 	<key>CFBundleIconFile</key>
 	<string></string>
 	<key>CFBundleIdentifier</key>
@@ -1677,11 +1749,11 @@
 	<key>CFBundlePackageType</key>
 	<string>KEXT</string>
 	<key>CFBundleShortVersionString</key>
-	<string>2.6.5</string>
+	<string>2.7.5</string>
 	<key>CFBundleSignature</key>
 	<string>????</string>
 	<key>CFBundleVersion</key>
-	<string>2.6.5</string>
+	<string>2.7.5</string>
 	<key>IOKitPersonalities</key>
 	<dict>
 		<key>AppleUSBPrinterDevice0</key>
@@ -2032,7 +2104,7 @@
 	<key>CFBundleExecutable</key>
 	<string>AppleUSBEHCI</string>
 	<key>CFBundleGetInfoString</key>
-	<string>2.7.0, Copyright © 2000-2007 Apple Inc., All Rights Reserved</string>
+	<string>2.7.5, Copyright © 2000-2007 Apple Inc., All Rights Reserved</string>
 	<key>CFBundleIconFile</key>
 	<string></string>
 	<key>CFBundleIdentifier</key>
@@ -2044,11 +2116,11 @@
 	<key>CFBundlePackageType</key>
 	<string>KEXT</string>
 	<key>CFBundleShortVersionString</key>
-	<string>2.7.0</string>
+	<string>2.7.5</string>
 	<key>CFBundleSignature</key>
 	<string>????</string>
 	<key>CFBundleVersion</key>
-	<string>2.7.0</string>
+	<string>2.7.5</string>
 	<key>IOKitPersonalities</key>
 	<dict>
 		<key>AppleUSBEHCI</key>
@@ -2545,7 +2617,7 @@
 		3EB498DD0640234A00F93E52 /* IOUSBHIDDriver.kext */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; path = IOUSBHIDDriver.kext; sourceTree = BUILT_PRODUCTS_DIR; };
 		3EB498DF0640234A00F93E52 /* AppleUSBEHCI.kext */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; path = AppleUSBEHCI.kext; sourceTree = BUILT_PRODUCTS_DIR; };
 		3EB498E30640234A00F93E52 /* AppleUSBUHCI.kext */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; path = AppleUSBUHCI.kext; sourceTree = BUILT_PRODUCTS_DIR; };
-		3EB498E50640234A00F93E52 /* installhdrs */ = {isa = PBXFileReference; explicitFileType = "compiled.mach-o.executable"; path = installhdrs; sourceTree = BUILT_PRODUCTS_DIR; };
+		3EB498E50640234A00F93E52 /* installhdrs */ = {isa = PBXFileReference; lastKnownFileType = "compiled.mach-o.executable"; path = installhdrs; sourceTree = BUILT_PRODUCTS_DIR; };
 		3EB498E70640234A00F93E52 /* KLog.kext */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; path = KLog.kext; sourceTree = BUILT_PRODUCTS_DIR; };
 		3EB498EB0640234A00F93E52 /* IOUSBUserClient.kext */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; path = IOUSBUserClient.kext; sourceTree = BUILT_PRODUCTS_DIR; };
 		3EB498ED0640234A00F93E52 /* AppleUSBHub.kext */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; path = AppleUSBHub.kext; sourceTree = BUILT_PRODUCTS_DIR; };
@@ -3739,6 +3811,7 @@
 			);
 			mainGroup = 089C166AFE841209C02AAC07 /* IOUSBFamily */;
 			projectDirPath = "";
+			projectRoot = "";
 			targets = (
 				018252AEFFB9EC537F000001 /* IOUSBFamily */,
 				01AE5998FBC3293E7F000001 /* installhdrs */,
@@ -4037,6 +4110,8 @@
 				F5538BFF0173BA7A01573190 /* IOUSBLog.cpp in Sources */,
 				F549761C0275E06B010162FA /* IOUSBControllerV2.cpp in Sources */,
 				DD37A4B2090859420074AE5D /* IOUSBControllerListElement.cpp in Sources */,
+				3E3DCD8C0BBD50E200B227B4 /* IOUSBDeviceUserClient.cpp in Sources */,
+				3E3DCD8F0BBD50EF00B227B4 /* IOUSBInterfaceUserClient.cpp in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -4062,8 +4137,6 @@
 			buildActionMask = 2147483647;
 			files = (
 				015935ACFFB89EA67F000001 /* IOUSBUserClientInit.cpp in Sources */,
-				029D4860FFC987587F000001 /* IOUSBDeviceUserClient.cpp in Sources */,
-				3A29FAF1FFD21A737F000001 /* IOUSBInterfaceUserClient.cpp in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

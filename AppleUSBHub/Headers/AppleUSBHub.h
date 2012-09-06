@@ -180,11 +180,18 @@ class AppleUSBHub : public IOService
 	bool		HubAreAllPortsDisconnectedOrSuspended();
     
     // test mode functions, called by the AppleUSBHSHubUserClient
-    IOReturn		EnterTestMode();
-    IOReturn		LeaveTestMode();
-    bool		IsHSRootHub();
-    IOReturn 		PutPortIntoTestMode(UInt32 port, UInt32 mode);
-    
+    IOReturn			EnterTestMode();
+    IOReturn			LeaveTestMode();
+    bool				IsHSRootHub();
+    IOReturn			PutPortIntoTestMode(UInt32 port, UInt32 mode);
+	
+	// Port Indicator and Port Power functions, called by the AppleUSBHSHubUserClient
+	IOReturn			SetIndicatorForPort(UInt16 port, UInt16 selector);
+	IOReturn			GetPortIndicatorControl(UInt16 port, UInt32 *defaultColors);
+    IOReturn			SetIndicatorsToAutomatic();
+	IOReturn			GetPortPower(UInt16 port, UInt32 *on);
+	IOReturn			SetPortPower(UInt16 port, UInt32 on);
+	
 public:
 
     virtual bool	init(OSDictionary * propTable );

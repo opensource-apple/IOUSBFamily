@@ -651,17 +651,21 @@ IOUSBInterfaceUserClient::clientClose( void )
 		{
 			USBLog(6, "+%s[%p]::clientClose closing provider", getName(), this);
 			
-			if ( fOwner) 
+			if ( fOwner && fOwner->isOpen(this) ) 
 			{
 				// Since this is call that tells us that our user space client has gone away, we can
 				// close our provider.  We don't set it to NULL because the IOKit object representing
 				// it has not gone away.  That will come in thru did/willTerminate.  Also, we should
 				// be checking whether fOwner was open before closing it, but we will do that later.
 				fOwner->close(this);
+				fNeedToClose = false;
 			}
 			
 			if ( fDead) 
+			{
+				fDead = false;
 				release();
+			}
 		}
 		else
 		{
@@ -2869,11 +2873,12 @@ IOUSBInterfaceUserClient::didTerminate( IOService * provider, IOOptionBits optio
     // hold on to the device and IOKit will terminate us when we close it later
 	USBLog(3, "%s[%p]::didTerminate isInactive = %d, outstandingIO = %ld", getName(), this, isInactive(), fOutstandingIO);
 	
-    if ( fOwner && fOwner->isOpen() )
+    if ( fOwner && fOwner->isOpen(this) )
     {
         if ( fOutstandingIO == 0 )
 		{
             fOwner->close(this);
+			fNeedToClose = false;
 			if ( isInactive() )
 				fOwner = NULL;
 		}
@@ -2924,14 +2929,19 @@ IOUSBInterfaceUserClient::DecrementOutstandingIO(void)
 		if (!--fOutstandingIO && fNeedToClose)
 		{
 			USBLog(3, "%s[%p]::DecrementOutstandingIO isInactive = %d, outstandingIO = %ld - closing device", getName(), this, isInactive(), fOutstandingIO);
-			if (fOwner) 
+			if ( fOwner && fOwner->isOpen(this))
 			{
 				fOwner->close(this);
+				fNeedToClose = false;
 				if ( isInactive() )
 					fOwner = NULL;
 			}
 			
-            if ( fDead) release();
+            if ( fDead) 
+			{
+				fDead = false;
+				release();
+			}
 		}
 		return;
     }
@@ -2973,15 +2983,19 @@ IOUSBInterfaceUserClient::ChangeOutstandingIO(OSObject *target, void *param1, vo
 			if (!--me->fOutstandingIO && me->fNeedToClose)
             {
                 USBLog(6, "%s[%p]::ChangeOutstandingIO isInactive = %d, outstandingIO = %ld - closing device", me->getName(), me, me->isInactive(), me->fOutstandingIO);
-                if (me->fOwner) 
+                if (me->fOwner && me->fOwner->isOpen(me)) 
 				{
 					me->fOwner->close(me);
+					me->fNeedToClose = false;
 					if ( me->isInactive() )
 						me->fOwner = NULL;
 				}
 				
                 if ( me->fDead) 
+				{
+					me->fDead = false;
 					me->release();
+				}
 			}
 			break;
 			

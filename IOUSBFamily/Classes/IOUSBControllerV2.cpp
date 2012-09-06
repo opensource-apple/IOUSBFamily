@@ -2,7 +2,7 @@
  *
  * @APPLE_LICENSE_HEADER_START@
  * 
- * Copyright (c) 1998-2003 Apple Computer, Inc.  All Rights Reserved.
+ * Copyright (c) 1998-2007 Apple Inc.  All Rights Reserved.
  * 
  * This file contains Original Code and/or Modifications of Original Code
  * as defined in and that are subject to the Apple Public Source License
@@ -417,37 +417,33 @@ IOUSBControllerV2::DoCreateEP(OSObject *owner,
 			
         case kUSBIsoc:
 		  {
-			UInt32 interval;
 
 			if (speed == kUSBDeviceSpeedHigh)
-			  {
+			{
 
 				// Filter out cases that violate the USB spec:
-				if (endpoint->interval < 1 || endpoint->interval > 16)
-				  {
+				if ((endpoint->interval < 1) || (endpoint->interval > 16))
+				{
 					USBLog(1, "%s[%p]::DoCreateEP - The USB 2.0 spec only allows Isoch EP with bInterval values of 1 through 16 "
 						   "(see Table 9-13), but the illegal interval %d [0x%x] was requested, returning kIOReturnBadArgument", 
 						   me->getName(), me, endpoint->interval, endpoint->interval);
 					err = kIOReturnBadArgument;
 					break;
-				  }
+				}
 
-				interval = (1 << (endpoint->interval - 1));
+				USBLog(4, "%s[%p]::DoCreateEP - Creating a High-Speed Isoch EP with raw interval %u", me->getName(), me, (unsigned int )endpoint->interval);
 
-				USBLog(1, "%s[%p]::DoCreateEP - Creating a High-Speed Isoch EP with interval %u [raw %u]", me->getName(), me, 
-					   (unsigned int )interval, (unsigned int )endpoint->interval);
-
-			  }
+			}
 			else
-			  {	// Full speed devices may have an invalid bInterval, thinking it doesn't
+			{	
+				// Full speed devices may have an invalid bInterval, thinking it doesn't
 				// matter. To protect ourselves, assign an interval of 1 - our code will
 				// do the right thing for full-speed devices then.
-				interval = 1;
+				endpoint->interval = 1;
 
-				USBLog(4, "%s[%p]::DoCreateEP - Creating a Full-Speed Isoch EP with interval %u [raw %u]", me->getName(), me, 
-					   (unsigned int )interval, (unsigned int )endpoint->interval);
+				USBLog(4, "%s[%p]::DoCreateEP - Creating a Full-Speed Isoch EP with interval %u", me->getName(), me, (unsigned int )endpoint->interval);
 
-			  }
+			}
 
 
 			err = me->UIMCreateIsochEndpoint(address,
@@ -456,7 +452,7 @@ IOUSBControllerV2::DoCreateEP(OSObject *owner,
 											 endpoint->direction,
 											 me->_highSpeedHub[address],
 											 me->_highSpeedPort[address],
-											 interval);
+											 endpoint->interval);
 			break;
 		  }
 
@@ -1079,6 +1075,7 @@ IOUSBControllerV2::ReturnIsochDoneQueue(IOUSBControllerIsochEndpoint* pEP)
 			
 			pHandler = pTD->_completion.action;
 			pTD->_completion.action = NULL;
+				
 			if (pEP->accumulatedStatus == kIOUSBBufferUnderrunErr)
 			{
 				USBLog(1, "IOUSBControllerV2[%p]::ReturnIsocDoneQueue - kIOReturnBufferUnderrunErr (PCI issue perhaps)", this);
@@ -1102,6 +1099,8 @@ IOUSBControllerV2::ReturnIsochDoneQueue(IOUSBControllerIsochEndpoint* pEP)
 			{
 				USBLog(1, "IOUSBControllerV2[%p]::ReturnIsocDoneQueue - _activeIsochTransfers went negative (%d).  We lost one somewhere", this, (int)_activeIsochTransfers);
 			}
+			else if (!_activeIsochTransfers)
+				requireMaxBusStall(0);										// remove maximum stall restraint on the PCI bus
 			
 			// if the accumulated status is aborted, then we need to keep that status until we are done
 			// otherwise the status will be in the endpoint when we get to the callback case and will

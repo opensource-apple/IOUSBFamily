@@ -503,6 +503,8 @@ AppleUSBEHCI::ResumeUSBBus()
     // restore volatile registers saved in SuspendUSBBus()
 	if (USBToHostLong(_pEHCIRegisters->ConfigFlag) != kEHCIPortRoutingBit)
 	{
+		USBError(1, "USB EHCI[%p] - Configure Flag Register appears to have been lost - power issue?", this);
+		
 		USBLog(5, "AppleUSBEHCI[%p]::ResumeUSBBus - restoring ConfigFlag[from 0x%x]",  this, (unsigned int) USBToHostLong(_pEHCIRegisters->ConfigFlag));
 		_pEHCIRegisters->ConfigFlag = HostToUSBLong(kEHCIPortRoutingBit);
 		IOSync();
@@ -999,11 +1001,18 @@ AppleUSBEHCI::SynchronizeCompanionRootHub(IOUSBControllerV2* companion)
 	{
 		while (_companionWakeHoldoff)
 		{
-			if ((i++ % 1000) == 0)
+			if ((i++ % 100) == 0)
 			{
 				USBLog(2, "AppleUSBEHCI[%p]::SynchronizeCompanionRootHub - waiting on behalf of companion[%p]", this, companion);
 			}
 			IOSleep(10);		// wait for 10 milliseconds before checking again
+			
+			// After 10 seconds, give up
+			if ( i > 1000)
+			{
+				USBLog(2, "AppleUSBEHCI[%p]::SynchronizeCompanionRootHub - Companion controller[%p] did not come up after 10 seconds!", this, companion);
+				USBError(1, "USB:  The companion controller[%p] for %p did not come up after 10 seconds!", companion, this);
+			}
 		}
 		USBLog(2, "AppleUSBEHCI[%p]::SynchronizeCompanionRootHub - companion[%p] is ready to go!!", this, companion);
 	}

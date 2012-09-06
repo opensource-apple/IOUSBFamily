@@ -352,12 +352,9 @@ IOUSBInterface::stop( IOService * provider )
 	
     ClosePipes();
 
-	if (_gate)
+	if (_expansionData && _gate && _workLoop)
 	{
-		if (_workLoop)
-			_workLoop->removeEventSource(_gate);
-		_gate->release();
-		_gate = NULL;
+		_workLoop->removeEventSource(_gate);
 	}
     
 	super::stop(provider);
@@ -378,6 +375,12 @@ IOUSBInterface::free()
     //
     if (_expansionData)
     {
+		if ( _gate)
+		{
+			_gate->release();
+			_gate = NULL;
+		}
+		
 		if (_workLoop)
 		{
 			_workLoop->release();
@@ -514,7 +517,7 @@ IOUSBInterface::open( IOService *forClient, IOOptionBits options, void *arg )
     bool			res = true;
     IOReturn		error = kIOReturnSuccess;
 	
-    if ( _gate )
+    if ( _expansionData && _gate )
     {
         USBLog(6,"%s[%p]::open calling super::open with gate", getName(), this);
         error = _gate->runAction( CallSuperOpen, (void *)forClient, (void *)options, (void *)arg );
@@ -590,7 +593,7 @@ IOUSBInterface::close( IOService *forClient, IOOptionBits options)
 {
     IOReturn		error = kIOReturnSuccess;
 
-    if ( _gate )
+    if ( _expansionData && _gate )
     {
         USBLog(6,"%s[%p]::close calling super::close with gate", getName(), this);
         (void) _gate->runAction( CallSuperClose, (void *)forClient, (void *)options);
@@ -621,7 +624,7 @@ IOUSBInterface::handleClose(IOService *	forClient, IOOptionBits	options )
     
     super::handleClose(forClient, options);
 
-	if (_needToClose)
+	if ( _expansionData && _needToClose)
 	{
 		USBLog(3,"IOUSBInterface[%p]::handleClose - now closing our provider from deferred close", this);
 		_device->close(this);
@@ -878,12 +881,12 @@ IOUSBInterface::matchPropertyTable(OSDictionary * table, SInt32 *score)
     UInt32      subClassIsWildCard = 0;
     UInt32      protocolIsWildCard = 0;
 	bool		usedMaskForProductID = false;
-   
+	
     if ( table == NULL )
     {
         return false;
     }
-        
+	
     bool	vendorPropertyExists = table->getObject(kUSBVendorID) ? true : false ;
     bool	productPropertyExists = table->getObject(kUSBProductID) ? true : false ;
     bool	interfaceNumberPropertyExists = table->getObject(kUSBInterfaceNumber) ? true : false ;
@@ -893,7 +896,7 @@ IOUSBInterface::matchPropertyTable(OSDictionary * table, SInt32 *score)
     bool	interfaceSubClassPropertyExists = table->getObject(kUSBInterfaceSubClass) ? true : false ;
     bool	interfaceProtocolPropertyExists= table->getObject(kUSBInterfaceProtocol) ? true : false ;
     bool    productIDMaskExists = table->getObject(kUSBProductIDMask) ? true : false;
-
+	
     // USBComparePropery() will return false if the property does NOT exist, or if it exists and it doesn't match
     //
     bool	vendorPropertyMatches = USBCompareProperty(table, kUSBVendorID);
@@ -910,60 +913,60 @@ IOUSBInterface::matchPropertyTable(OSDictionary * table, SInt32 *score)
     //
     if ( !vendorPropertyMatches )               
     { 
-	vendorPropertyMatches = IsWildCardMatch(table, kUSBVendorID); 
-	if ( vendorPropertyMatches ) 
-	    vendorIsWildCard++; 
+		vendorPropertyMatches = IsWildCardMatch(table, kUSBVendorID); 
+		if ( vendorPropertyMatches ) 
+			vendorIsWildCard++; 
     }
     
     if ( !productPropertyMatches )
     { 
-	productPropertyMatches = IsWildCardMatch(table, kUSBProductID);
-	if ( productPropertyMatches ) 
-	{
-	    productIsWildCard++; 
-	}
+		productPropertyMatches = IsWildCardMatch(table, kUSBProductID);
+		if ( productPropertyMatches ) 
+		{
+			productIsWildCard++; 
+		}
     }
     
     if ( !interfaceNumberPropertyMatches )
     { 
-	interfaceNumberPropertyMatches = IsWildCardMatch(table, kUSBInterfaceNumber);
-	if ( interfaceNumberPropertyMatches ) 
-	    interfaceNumberIsWildCard++; 
+		interfaceNumberPropertyMatches = IsWildCardMatch(table, kUSBInterfaceNumber);
+		if ( interfaceNumberPropertyMatches ) 
+			interfaceNumberIsWildCard++; 
     }
     
     if ( !configurationValuePropertyMatches )
     { 
-	configurationValuePropertyMatches = IsWildCardMatch(table, kUSBConfigurationValue);
-	if ( configurationValuePropertyMatches ) 
-	    configurationValueIsWildCard++; 
+		configurationValuePropertyMatches = IsWildCardMatch(table, kUSBConfigurationValue);
+		if ( configurationValuePropertyMatches ) 
+			configurationValueIsWildCard++; 
     }
     
     if ( !deviceReleasePropertyMatches )
     { 
-	deviceReleasePropertyMatches = IsWildCardMatch(table, kUSBDeviceReleaseNumber);
-	if ( deviceReleasePropertyMatches ) 
-	    deviceReleaseIsWildCard++;
+		deviceReleasePropertyMatches = IsWildCardMatch(table, kUSBDeviceReleaseNumber);
+		if ( deviceReleasePropertyMatches ) 
+			deviceReleaseIsWildCard++;
     }
     
     if ( !interfaceClassPropertyMatches )
     { 
-	interfaceClassPropertyMatches = IsWildCardMatch(table, kUSBInterfaceClass);
-	if ( interfaceClassPropertyMatches ) 
-	    classIsWildCard++;
+		interfaceClassPropertyMatches = IsWildCardMatch(table, kUSBInterfaceClass);
+		if ( interfaceClassPropertyMatches ) 
+			classIsWildCard++;
     }
     
     if ( !interfaceSubClassPropertyMatches )
     { 
-	interfaceSubClassPropertyMatches = IsWildCardMatch(table, kUSBInterfaceSubClass);
-	if ( interfaceSubClassPropertyMatches ) 
-	    subClassIsWildCard++; 
+		interfaceSubClassPropertyMatches = IsWildCardMatch(table, kUSBInterfaceSubClass);
+		if ( interfaceSubClassPropertyMatches ) 
+			subClassIsWildCard++; 
     }
     
     if ( !interfaceProtocolPropertyMatches )
     { 
-	interfaceProtocolPropertyMatches = IsWildCardMatch(table, kUSBInterfaceProtocol);
-	if ( interfaceProtocolPropertyMatches ) 
-	    protocolIsWildCard++; 
+		interfaceProtocolPropertyMatches = IsWildCardMatch(table, kUSBInterfaceProtocol);
+		if ( interfaceProtocolPropertyMatches ) 
+			protocolIsWildCard++; 
     }
     
     // If the productID didn't match, then see if there is a kProductIDMask property.  If there is, mask this device's prodID and the dictionary's prodID with it and see
@@ -971,28 +974,17 @@ IOUSBInterface::matchPropertyTable(OSDictionary * table, SInt32 *score)
 	//
     if ( !productPropertyMatches && productIDMaskExists )
     {
-	productPropertyMatches = USBComparePropertyWithMask( table, kUSBProductID, kUSBProductIDMask);
-	usedMaskForProductID = productPropertyMatches;
+		productPropertyMatches = USBComparePropertyWithMask( table, kUSBProductID, kUSBProductIDMask);
+		usedMaskForProductID = productPropertyMatches;
     }
     
     // If the service object wishes to compare some of its properties in its
     // property table against the supplied matching dictionary,
     // it should do so in this method and return truth on success.
     //
-    if (!super::matchPropertyTable(table))  return false;
-    
-    // something of a hack. We need the IOUSBUserClientInit "driver" to match in order
-    // for us to be able to find the user mode plugin. However, that driver can't
-    // effectively match using the USB Common Class Spec, so we special case it as a
-    // short circuit
-    userClientInitMatchKey = OSDynamicCast(OSString, table->getObject(kIOMatchCategoryKey));
-    if (userClientInitMatchKey && !strcmp(userClientInitMatchKey->getCStringNoCopy(), "IOUSBUserClientInit"))
-    {
-        USBLog(6, "%s[%p]: matching IOUSBUserClientInit", getName(), this);
-        *score = 9000;
-        return true;
-    }
-    
+    if (!super::matchPropertyTable(table))  
+		return false;
+        
     // If the property score is > 10000, then clamp it to 9000.  We will then add this score
     // to the matching criteria score.  This will allow drivers
     // to still override a driver with the same matching criteria.  Since we score the matching
@@ -1005,22 +997,22 @@ IOUSBInterface::matchPropertyTable(OSDictionary * table, SInt32 *score)
     //
 	OSObject *interfaceClassProp = copyProperty(kUSBInterfaceClass);
     OSNumber *interfaceClass = OSDynamicCast(OSNumber, interfaceClassProp);
-
+	
     if ( vendorPropertyMatches && productPropertyMatches && deviceReleasePropertyMatches &&
-            configurationValuePropertyMatches &&  interfaceNumberPropertyMatches &&
-            (!interfaceClassPropertyExists || interfaceClassPropertyMatches) && 
-            (!interfaceSubClassPropertyExists || interfaceSubClassPropertyMatches) && 
-            (!interfaceProtocolPropertyExists || interfaceProtocolPropertyMatches) )
+		 configurationValuePropertyMatches &&  interfaceNumberPropertyMatches &&
+		 (!interfaceClassPropertyExists || interfaceClassPropertyMatches) && 
+		 (!interfaceSubClassPropertyExists || interfaceSubClassPropertyMatches) && 
+		 (!interfaceProtocolPropertyExists || interfaceProtocolPropertyMatches) )
     {
         *score = 100000;
         wildCardMatches = vendorIsWildCard + productIsWildCard + deviceReleaseIsWildCard + configurationValueIsWildCard + interfaceNumberIsWildCard;
     }
     else if ( vendorPropertyMatches && productPropertyMatches && configurationValuePropertyMatches && 
-                interfaceNumberPropertyMatches &&
-                (!deviceReleasePropertyExists || deviceReleasePropertyMatches) && 
-                (!interfaceClassPropertyExists || interfaceClassPropertyMatches) && 
-                (!interfaceSubClassPropertyExists || interfaceSubClassPropertyMatches) && 
-                (!interfaceProtocolPropertyExists || interfaceProtocolPropertyMatches) )
+			  interfaceNumberPropertyMatches &&
+			  (!deviceReleasePropertyExists || deviceReleasePropertyMatches) && 
+			  (!interfaceClassPropertyExists || interfaceClassPropertyMatches) && 
+			  (!interfaceSubClassPropertyExists || interfaceSubClassPropertyMatches) && 
+			  (!interfaceProtocolPropertyExists || interfaceProtocolPropertyMatches) )
     {
         *score = 90000;
         wildCardMatches = vendorIsWildCard + productIsWildCard + configurationValueIsWildCard + interfaceNumberIsWildCard;
@@ -1028,17 +1020,17 @@ IOUSBInterface::matchPropertyTable(OSDictionary * table, SInt32 *score)
     else if ( interfaceClass && (interfaceClass->unsigned32BitValue() == kUSBVendorSpecificClass ))
     {
         if (  vendorPropertyMatches && interfaceSubClassPropertyMatches && interfaceProtocolPropertyMatches && 
-                (!interfaceClassPropertyExists || interfaceClassPropertyMatches) && 
-                !deviceReleasePropertyExists && !productPropertyExists &&
-                !interfaceNumberPropertyExists && !configurationValuePropertyExists )
+			  (!interfaceClassPropertyExists || interfaceClassPropertyMatches) && 
+			  !deviceReleasePropertyExists && !productPropertyExists &&
+			  !interfaceNumberPropertyExists && !configurationValuePropertyExists )
         {
             *score = 80000;
             wildCardMatches = vendorIsWildCard + subClassIsWildCard + protocolIsWildCard;
         }
         else if ( vendorPropertyMatches && interfaceSubClassPropertyMatches &&
-                    (!interfaceClassPropertyExists || interfaceClassPropertyMatches) && 
-                    !interfaceProtocolPropertyExists && !deviceReleasePropertyExists && 
-                    !productPropertyExists && !interfaceNumberPropertyExists && !configurationValuePropertyExists )
+				  (!interfaceClassPropertyExists || interfaceClassPropertyMatches) && 
+				  !interfaceProtocolPropertyExists && !deviceReleasePropertyExists && 
+				  !productPropertyExists && !interfaceNumberPropertyExists && !configurationValuePropertyExists )
         {
             *score = 70000;
             wildCardMatches = vendorIsWildCard + subClassIsWildCard;
@@ -1050,15 +1042,15 @@ IOUSBInterface::matchPropertyTable(OSDictionary * table, SInt32 *score)
         }
     }
     else if (  interfaceClassPropertyMatches && interfaceSubClassPropertyMatches && interfaceProtocolPropertyMatches &&
-                !deviceReleasePropertyExists &&  !vendorPropertyExists && !productPropertyExists && 
-                !interfaceNumberPropertyExists && !configurationValuePropertyExists )
+			   !deviceReleasePropertyExists &&  !vendorPropertyExists && !productPropertyExists && 
+			   !interfaceNumberPropertyExists && !configurationValuePropertyExists )
     {
         *score = 60000;
         wildCardMatches = classIsWildCard + subClassIsWildCard + protocolIsWildCard;
     }
     else if (  interfaceClassPropertyMatches && interfaceSubClassPropertyMatches &&
-                !interfaceProtocolPropertyExists && !deviceReleasePropertyExists &&  !vendorPropertyExists && 
-                !productPropertyExists && !interfaceNumberPropertyExists && !configurationValuePropertyExists )
+			   !interfaceProtocolPropertyExists && !deviceReleasePropertyExists &&  !vendorPropertyExists && 
+			   !productPropertyExists && !interfaceNumberPropertyExists && !configurationValuePropertyExists )
     {
         *score = 50000;
         wildCardMatches = classIsWildCard + subClassIsWildCard;
@@ -1068,7 +1060,7 @@ IOUSBInterface::matchPropertyTable(OSDictionary * table, SInt32 *score)
         *score = 0;
         returnValue = false;
     }
-
+	
     // Add in the xml probe score if it's available.
     //
     if ( *score != 0 )
@@ -1081,7 +1073,7 @@ IOUSBInterface::matchPropertyTable(OSDictionary * table, SInt32 *score)
     // Subtract 500 if the usedMaskForProductID was set
     //
     if ( usedMaskForProductID )
-	*score -= 500;
+		*score -= 500;
     
     //  Only execute the debug code if we are logging at higher than level 4
     //
@@ -1189,7 +1181,7 @@ IOUSBInterface::matchPropertyTable(OSDictionary * table, SInt32 *score)
 	
 	if (interfaceClassProp)
 		interfaceClassProp->release();
-		
+	
 	return returnValue;
 }
 
@@ -1263,12 +1255,29 @@ IOUSBInterface::message( UInt32 type, IOService * provider,  void * argument )
 bool
 IOUSBInterface::didTerminate( IOService * provider, IOOptionBits options, bool * defer )
 {
-	if (_device && (_device == provider))
+	return super::didTerminate(provider, options, defer);
+}
+
+
+//
+// IOUSBInterface::terminate
+//
+// Since IOUSBInterface is most often terminated directly by the USB family, willTerminate and didTerminate will not be called most of the time
+// therefore we do things which we might otherwise have done in those methods before and after we call super::terminate (5024412)
+//
+bool	
+IOUSBInterface::terminate( IOOptionBits options )
+{
+	bool	retValue;
+	
+	USBLog(5, "+%s[%p]::terminate", getName(), this);
+	
+	if (_device)
 	{
-		USBLog(6, "IOUSBInterface[%p]::didTerminate - closing _device", this);
+		USBLog(5, "%s[%p]::terminate - closing _device", getName(), this);
 		if (isOpen())
 		{
-			USBLog(3, "IOUSBInterface[%p]::didTerminate - deferring close because someone still has us open", this);
+			USBLog(5, "%s[%p]::terminate - deferring close because someone still has us open", getName(), this);
 			_needToClose = true;
 		}
 		else
@@ -1278,9 +1287,14 @@ IOUSBInterface::didTerminate( IOService * provider, IOOptionBits options, bool *
 	}
 	else
 	{
-		USBLog(1, "IOUSBInterface[%p]::didTerminate - not closing device[%p] provider[%p]", this, _device, provider);
+		USBLog(2, "%s[%p]::didTerminate - NULL _device!!", getName(), this);
 	}
-	return true;
+	
+	USBLog(5, "-%s[%p]::terminate", getName(), this);
+	
+	retValue = super::terminate(options);
+	
+	return retValue;
 }
 
 

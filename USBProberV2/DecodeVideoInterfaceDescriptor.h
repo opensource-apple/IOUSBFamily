@@ -431,6 +431,33 @@ struct IOUSBVDC_MJPEGFormatDescriptor
 typedef struct IOUSBVDC_MJPEGFormatDescriptor IOUSBVDC_MJPEGFormatDescriptor;
 #pragma options align=reset
 
+struct IOSUBVDC_StillImageSize
+{
+	UInt16	wWidth;
+	UInt16	wHeight;
+};
+typedef struct IOSUBVDC_StillImageSize IOSUBVDC_StillImageSize;
+
+struct IOSUBVDC_StillImageCompressionPattern
+{
+	UInt8	bNumCompressionPattern;
+	UInt8	bCompression[1];
+};
+typedef struct IOSUBVDC_StillImageCompressionPattern IOSUBVDC_StillImageCompressionPattern;
+
+#pragma pack(1)
+struct IOUSBVDC_StillImageFrameDescriptor
+{
+    UInt8	bLength;
+    UInt8	bDescriptorType;
+    UInt8	bDescriptorSubType;
+    UInt8	bEndpointAddress;
+    UInt8	bNumImageSizePatterns;
+	IOSUBVDC_StillImageSize	dwSize[1];
+};
+typedef struct IOUSBVDC_StillImageFrameDescriptor IOUSBVDC_StillImageFrameDescriptor;
+#pragma options align=reset
+
 #pragma pack(1)
 struct IOUSBVDC_MJPEGFrameDescriptor
 {
