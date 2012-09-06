@@ -2,7 +2,7 @@
  *
  * @APPLE_LICENSE_HEADER_START@
  * 
- * Copyright (c) 1998-2003 Apple Computer, Inc.  All Rights Reserved.
+ * Copyright (c) 1998-2007 Apple Inc.  All Rights Reserved.
  * 
  * This file contains Original Code and/or Modifications of Original Code
  * as defined in and that are subject to the Apple Public Source License
@@ -3237,7 +3237,16 @@ IOUSBDevice::GetBus(void)
 UInt32 
 IOUSBDevice::GetBusPowerAvailable( void ) 
 { 
+	USBLog(2, "IOUSBDevice[%p]::GetBusPowerAvailable - returning(%d)", this, (int)_busPowerAvailable);
     return _busPowerAvailable; 
+}
+
+void
+IOUSBDevice::SetBusPowerAvailable(UInt32 newPower)
+{
+	_busPowerAvailable = newPower;
+	setProperty(kUSBDevicePropertyBusPowerAvailable, (unsigned long long)_busPowerAvailable, (sizeof(_busPowerAvailable) * 8));
+	USBLog(2, "IOUSBDevice[%p]::SetBusPowerAvailable - power now(%d)", this, (int)_busPowerAvailable);
 }
 
 UInt8 

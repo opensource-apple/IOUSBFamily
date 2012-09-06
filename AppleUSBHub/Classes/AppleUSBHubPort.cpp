@@ -2,7 +2,7 @@
  *
  * @APPLE_LICENSE_HEADER_START@
  * 
- * Copyright (c) 1998-2006 Apple Computer, Inc.  All Rights Reserved.
+ * Copyright (c) 1998-2007 Apple Inc.  All Rights Reserved.
  * 
  * This file contains Original Code and/or Modifications of Original Code
  * as defined in and that are subject to the Apple Public Source License
@@ -450,9 +450,9 @@ AppleUSBHubPort::AddDevice(void)
 void 
 AppleUSBHubPort::RemoveDevice(void)
 {
-    bool			ok;
-    const IORegistryPlane 	* usbPlane;
-    IOUSBDevice			*cachedPortDevice;
+    bool						ok;
+    const IORegistryPlane		*usbPlane;
+    IOUSBDevice					*cachedPortDevice;
 
 
     if (_portDevice)
@@ -470,11 +470,19 @@ AppleUSBHubPort::RemoveDevice(void)
             cachedPortDevice->detachAll(usbPlane);
 
         cachedPortDevice->terminate(kIOServiceRequired);
+		
+		if (_extraPower)
+		{
+			_portPowerAvailable = kUSB100mAAvailable;
+			_hub->ReturnExtraPortPower(this);
+		}
+			
         cachedPortDevice->release();
     }
 
     InitPortVectors();
 }
+
 
 
 IOReturn 
@@ -786,7 +794,10 @@ AppleUSBHubPort::FatalError(IOReturn err, char *str)
     }
 }
 
-static IOReturn DoCreateDevice(	IOUSBController  *bus,
+
+
+static IOReturn 
+DoCreateDevice(	IOUSBController  *bus,
                                 IOUSBDevice 		*newDevice,
                                 USBDeviceAddress	deviceAddress,
                                 UInt8		 	maxPacketSize,
@@ -795,7 +806,7 @@ static IOReturn DoCreateDevice(	IOUSBController  *bus,
                                 USBDeviceAddress		hub,
                                 int      port)
 {
-IOUSBControllerV2 *v2Bus;
+	IOUSBControllerV2 *v2Bus;
 
     v2Bus = OSDynamicCast(IOUSBControllerV2, bus);
     
@@ -808,7 +819,9 @@ IOUSBControllerV2 *v2Bus;
         return(bus->CreateDevice(newDevice, deviceAddress, maxPacketSize, speed, powerAvailable));
     }
 }
-	
+
+
+
 static IOReturn DoConfigureDeviceZero(IOUSBController  *bus, UInt8 maxPacketSize, UInt8 speed, USBDeviceAddress hub, int port)
 {
 IOUSBControllerV2 *v2Bus;
@@ -1092,9 +1105,9 @@ AppleUSBHubPort::AddDeviceResetChangeHandler(UInt16 changeFlags, UInt16 statusFl
             return err;
         }
 
-        _state = hpsNormal;
-        
-       err = DoCreateDevice(_bus, usbDevice, address, _desc.bMaxPacketSize0, _speed, _portPowerAvailable, _hub->_device->GetAddress(), _portNum);
+		_state = hpsNormal;
+
+		err = DoCreateDevice(_bus, usbDevice, address, _desc.bMaxPacketSize0, _speed, _portPowerAvailable, _hub->_device->GetAddress(), _portNum);
         if ( !err )
         {
 			_portDevice = usbDevice;
@@ -1107,28 +1120,28 @@ AppleUSBHubPort::AddDeviceResetChangeHandler(UInt16 changeFlags, UInt16 statusFl
 			usbDevice = NULL;
         }
         
-	if (!_portDevice)
-	{
-	    // OOPS- The device went away from under us. Probably due to an unplug. Well, there is nothing more
-	    // for us to do, so just return
-            USBLog(3, "**9** AppleUSBHubPort[%p]::AddDeviceResetChangeHandler - port %d, _portDevice disappeared, cleaning up", this, _portNum);
-            _retryPortStatus = true;
+		if (!_portDevice)
+		{
+			// OOPS- The device went away from under us. Probably due to an unplug. Well, there is nothing more
+			// for us to do, so just return
+				USBLog(3, "**9** AppleUSBHubPort[%p]::AddDeviceResetChangeHandler - port %d, _portDevice disappeared, cleaning up", this, _portNum);
+				_retryPortStatus = true;
 
-            SetPortVector(&AppleUSBHubPort::DefaultResetChangeHandler, kHubPortBeingReset);
-            _hub->ClearPortFeature(kUSBHubPortEnableFeature, _portNum);
-            // ¥¥ Not in 9 ¥¥
-            if (_devZero)
-            {
-                USBLog(3, "**9** AppleUSBHubPort[%p]::AddDeviceResetChangeHandler - port %d, releasing devZero lock", this, _portNum);
-                _bus->ReleaseDeviceZero();
-                _devZero = false;
-            }
+				SetPortVector(&AppleUSBHubPort::DefaultResetChangeHandler, kHubPortBeingReset);
+				_hub->ClearPortFeature(kUSBHubPortEnableFeature, _portNum);
+				// ¥¥ Not in 9 ¥¥
+				if (_devZero)
+				{
+					USBLog(3, "**9** AppleUSBHubPort[%p]::AddDeviceResetChangeHandler - port %d, releasing devZero lock", this, _portNum);
+					_bus->ReleaseDeviceZero();
+					_devZero = false;
+				}
 
-            USBLog(3, "**9** AppleUSBHubPort[%p]::AddDeviceResetChangeHandler - port %d, delaying 10 ms and calling AddDevice", this, _portNum);
-            IOSleep(10); // ¥¥ÊNine waits for only 1ms
-            err = AddDevice();		
-            return err;
-	}
+				USBLog(3, "**9** AppleUSBHubPort[%p]::AddDeviceResetChangeHandler - port %d, delaying 10 ms and calling AddDevice", this, _portNum);
+				IOSleep(10); // ¥¥ÊNine waits for only 1ms
+				err = AddDevice();		
+				return err;
+		}
 	
         // In MacOS 9, we attempt to get the full DeviceDescriptor at this point, if we had missed it earlier.  On X, we do NOT do this
         // because we would have failed the IOUSBDevice::start if we didn't get it.
@@ -1159,7 +1172,53 @@ AppleUSBHubPort::AddDeviceResetChangeHandler(UInt16 changeFlags, UInt16 statusFl
         _portDevice->SetProperties();
         if ( IsCaptive() )
             _portDevice->setProperty("non-removable","yes");
-       
+		else
+		{
+
+			// are we capable of handing out more power..
+			if ((_portPowerAvailable == kUSB100mAAvailable) && (_hub->GetExtraPortPower(this) == kIOReturnSuccess))
+			{
+				int											numConfigs = _portDevice->GetNumConfigurations();
+				int											i;
+				const IOUSBConfigurationDescriptor *		cd = NULL;
+				bool										keepExtraPower = false;
+				OSNumber									*deviceClassProp = (OSNumber*)_portDevice->getProperty(kUSBDeviceClass);
+				UInt32										deviceClass;
+				
+				if (deviceClassProp)
+					deviceClass = deviceClassProp->unsigned32BitValue();
+
+				if (deviceClass == kUSBHubClass)
+				{
+					USBLog(2, "AppleUSBHubPort[%p]::AddDeviceResetChangeHandler - we might use the extra power for hub device - hanging on to it", this);
+					keepExtraPower = true;
+				}
+				else
+				{
+					USBLog(2, "AppleUSBHubPort[%p]::AddDeviceResetChangeHandler - we have extra port power - seeing if we need it with our %d configs", this, numConfigs);
+					for (i=0; i < numConfigs; i++)
+					{
+						cd = _portDevice->GetFullConfigurationDescriptor(i);
+						if (cd && (cd->MaxPower > kUSB100mAAvailable))
+						{
+							USBLog(2, "AppleUSBHubPort[%p]::AddDeviceResetChangeHandler - we might use the extra power for config[%d] - hanging on to it", this, i);
+							keepExtraPower = true;
+							break;
+						}
+					}
+				}
+				if (keepExtraPower)
+				{
+					_portPowerAvailable = kUSB500mAAvailable;
+					_portDevice->SetBusPowerAvailable(_portPowerAvailable);
+				}
+				else
+				{
+					USBLog(2, "AppleUSBHubPort[%p]::AddDeviceResetChangeHandler - returning extra power since I don't have a config which needs it", this);
+					_hub->ReturnExtraPortPower(this);
+				}
+			}
+		}
         // register the NUB
 		USBLog(5, "AppleUSBHubPort[%p]::AddDeviceResetChangeHandler - port %d, calling registerService for device %s", this, _portNum, _portDevice->getName() );
         _portDevice->registerService();
@@ -1488,12 +1547,12 @@ IOReturn
 AppleUSBHubPort::DefaultOverCrntChangeHandler(UInt16 changeFlags, UInt16 statusFlags)
 {
     IOUSBHubDescriptor		hubDescriptor;
-    bool			individualPortPower = FALSE;
-    UInt16			characteristics;
+    bool					individualPortPower = FALSE;
+    UInt16					characteristics;
     IOUSBHubPortStatus		portStatus;
-    IOReturn			err;
+    IOReturn					err;
 
-    USBLog(5, "AppleUSBHubPort[%p]::DefaultOverCrntChangeHandler. Port %d", this,  _portNum );
+    USBLog(1, "AppleUSBHubPort[%p]::DefaultOverCrntChangeHandler. Port %d", this,  _portNum );
     err = _hub->GetPortStatus(&portStatus, _portNum);
 
     if ( (err == kIOReturnSuccess) && (portStatus.changeFlags != 0x1f) )

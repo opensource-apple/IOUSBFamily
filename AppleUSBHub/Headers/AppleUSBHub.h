@@ -2,7 +2,7 @@
  *
  * @APPLE_LICENSE_HEADER_START@
  * 
- * Copyright (c) 1998-2003 Apple Computer, Inc.  All Rights Reserved.
+ * Copyright (c) 1998-2007 Apple Inc.  All Rights Reserved.
  * 
  * This file contains Original Code and/or Modifications of Original Code
  * as defined in and that are subject to the Apple Public Source License
@@ -33,6 +33,7 @@
 #include <IOKit/usb/USB.h>
 #include <IOKit/usb/USBHub.h>
 #include <IOKit/usb/IOUSBLog.h>
+#include <IOKit/usb/IOUSBRootHubDevice.h>
 
 #include <kern/thread_call.h>
 
@@ -51,8 +52,9 @@ __attribute__((format(printf, 1, 2)));
 #endif
 
 enum{
-      kErrataCaptiveOKBit = 1,
-      kStartupDelayBit = 2,
+      kErrataCaptiveOKBit = 0x01,
+      kStartupDelayBit =	0x02,
+	  kExtraPowerPossible = 0x04
 };
 
 class IOUSBController;
@@ -69,91 +71,98 @@ class AppleUSBHub : public IOService
     friend class AppleUSBHubPort;
     friend class AppleUSBHSHubUserClient;
 
-    IOUSBController *		_bus;
-    IOUSBDevice *		_device;
-    IOUSBInterface *		_hubInterface;
-    IOUSBConfigurationDescriptor *_configDescriptor;
-    IOUSBHubDescriptor		_hubDescriptor;
-    USBDeviceAddress   		_address;
-    IOUSBHubPortStatus       	_hubStatus;
-    IOUSBPipe * 		_interruptPipe;
-    IOBufferMemoryDescriptor *	_buffer;
-    IOCommandGate *		_gate;
-    IOWorkLoop *		_workLoop;
-    UInt32			_locationID;
-    UInt32			_inStartMethod;
-	UInt32			_devZeroLockedTimeoutCounter;					// We use this to count down to see when we need to check for a possible stuck dev zero lock
-    bool			_portSuspended;
-    bool			_hubHasBeenDisconnected;
-    bool			_hubIsDead;
-	bool			_abortExpected;
-	UInt32			_retryCount;
-    
+    IOUSBController *				_bus;
+    IOUSBDevice *					_device;
+    IOUSBInterface *				_hubInterface;
+    IOUSBConfigurationDescriptor	*_configDescriptor;
+    IOUSBHubDescriptor				_hubDescriptor;
+    USBDeviceAddress				_address;
+    IOUSBHubPortStatus				_hubStatus;
+    IOUSBPipe *						_interruptPipe;
+    IOBufferMemoryDescriptor *		_buffer;
+    IOCommandGate *					_gate;
+    IOWorkLoop *					_workLoop;
+    UInt32							_locationID;
+    UInt32							_inStartMethod;
+	UInt32							_devZeroLockedTimeoutCounter;					// We use this to count down to see when we need to check for a possible stuck dev zero lock
+    bool							_portSuspended;
+    bool							_hubHasBeenDisconnected;
+    bool							_hubIsDead;
+	bool							_abortExpected;
+	UInt32							_retryCount;
+    IOUSBRootHubDevice *			_rootHubParent;									// set if our hub is attached to a root hub
+	
     // Power stuff
-    bool			_busPowered;
-    bool			_selfPowered;
-    bool			_busPowerGood;
-    bool       			_selfPowerGood;
-    bool			_needToClose;
+    bool							_busPowered;
+    bool							_selfPowered;
+    bool							_busPowerGood;
+    bool							_selfPowerGood;
+	AppleRootHubExtraPowerRequest	_extraPower;									// request from a root hub due to a property
+	UInt32							_extraPowerPorts;								// from a property
+	UInt32							_extraPowerRemaining;							// how many milliamps we can still give to any one port
+		
+	// bookkeeping
+    bool							_needToClose;
     
-    UInt32			_powerForCaptive;
-    thread_call_t		_workThread;
-    thread_call_t		_resetPortZeroThread;
-    thread_call_t		_hubDeadCheckThread;
-    thread_call_t		_clearFeatureEndpointHaltThread;
+    UInt32							_powerForCaptive;
+    thread_call_t					_workThread;
+    thread_call_t					_resetPortZeroThread;
+    thread_call_t					_hubDeadCheckThread;
+    thread_call_t					_clearFeatureEndpointHaltThread;
 
     // Port stuff
-    UInt8			_readBytes;
-    UInt8			_numCaptive;
-    AppleUSBHubPort **	   	_ports;		// Allocated at runtime
-    bool			_multiTTs;	// Hub is multiTT capable, and configured.
-    bool			_hsHub;		// our provider is a HS bus
-    bool			_isRootHub;	// we are driving a root hub (needed for test mode)
-    bool			_inTestMode;	// T while we are in test mode
-    IOTimerEventSource *      	_timerSource;
-    UInt32			_timeoutFlag;
-    UInt32			_portTimeStamp[32];
-    UInt32			_portWithDevZeroLock;
-    UInt32			_outstandingIO;
+    UInt8							_readBytes;
+    UInt8							_numCaptive;
+    AppleUSBHubPort **				_ports;						// Allocated at runtime
+    bool							_multiTTs;					// Hub is multiTT capable, and configured.
+    bool							_hsHub;						// our provider is a HS bus
+    bool							_isRootHub;					// we are driving a root hub (needed for test mode)
+    bool							_inTestMode;				// T while we are in test mode
+    IOTimerEventSource *			_timerSource;
+    UInt32							_timeoutFlag;
+    UInt32							_portTimeStamp[32];
+    UInt32							_portWithDevZeroLock;
+    UInt32							_outstandingIO;
 
     // Errata stuff
-    UInt32			_errataBits;
-    UInt32			_startupDelay;
+    UInt32							_errataBits;
+    UInt32							_startupDelay;
     
     static void 	InterruptReadHandlerEntry(OSObject *target, void *param, IOReturn status, UInt32 bufferSizeRemaining);
-    void 		InterruptReadHandler(IOReturn status, UInt32 bufferSizeRemaining);
+    void			InterruptReadHandler(IOReturn status, UInt32 bufferSizeRemaining);
     
     static void 	ProcessStatusChangedEntry(OSObject *target);
-    void 		ProcessStatusChanged(void);
+    void			ProcessStatusChanged(void);
 
     static void		ResetPortZeroEntry(OSObject *target);
-    void		ResetPortZero();
+    void			ResetPortZero();
     
     static void 	CheckForDeadHubEntry(OSObject *target);
-    void		CheckForDeadHub();
+    void			CheckForDeadHub();
 
     static void		ClearFeatureEndpointHaltEntry(OSObject *target);
-    void		ClearFeatureEndpointHalt(void);
+    void			ClearFeatureEndpointHalt(void);
 
     static void 	TimeoutOccurred(OSObject *owner, IOTimerEventSource *sender);
 
     IOReturn 		DoDeviceRequest(IOUSBDevRequest *request);
-    UInt32		GetHubErrataBits(void);
+    UInt32			GetHubErrataBits(void);
 
-    void		DecrementOutstandingIO(void);
-    void		IncrementOutstandingIO(void);
+	// bookkeeping
+    void			DecrementOutstandingIO(void);
+    void			IncrementOutstandingIO(void);
     static IOReturn	ChangeOutstandingIO(OSObject *target, void *arg0, void *arg1, void *arg2, void *arg3);
 
     // Hub functions
-    void		UnpackPortFlags(void);
-    void 		CountCaptivePorts(void);
+    void			UnpackPortFlags(void);
+    void			CountCaptivePorts(void);
     IOReturn		CheckPortPowerRequirements(void);
     IOReturn		AllocatePortMemory(void);
     IOReturn		StartPorts(void);
     IOReturn 		StopPorts(void);
     IOReturn		ConfigureHub(void);
 
-    bool		HubStatusChanged(void);
+    bool			HubStatusChanged(void);
 
     IOReturn		GetHubDescriptor(IOUSBHubDescriptor *desc);
     IOReturn		GetHubStatus(IOUSBHubStatus *status);
@@ -164,20 +173,25 @@ class AppleUSBHub : public IOService
     IOReturn		SetPortFeature(UInt16 feature, UInt16 port);
     IOReturn		ClearPortFeature(UInt16 feature, UInt16 port);
 
-    void 		PrintHubDescriptor(IOUSBHubDescriptor *desc);
+    void			PrintHubDescriptor(IOUSBHubDescriptor *desc);
 
-    void 		FatalError(IOReturn err, char *str);
+    void			FatalError(IOReturn err, char *str);
     IOReturn		DoPortAction(UInt32 type, UInt32 portNumber, UInt32 options );
-    void		StartWatchdogTimer();
-    void		StopWatchdogTimer();
+    void			StartWatchdogTimer();
+    void			StopWatchdogTimer();
     IOReturn		RearmInterruptRead();
-    void		ResetMyPort();
-    void		CallCheckForDeadHub(void);
+    void			ResetMyPort();
+    void			CallCheckForDeadHub(void);
 
     IOUSBHubDescriptor 	GetCachedHubDescriptor() { return _hubDescriptor; }
-    bool		MergeDictionaryIntoProvider(IOService *  provider, OSDictionary *  mergeDict);
-    bool		MergeDictionaryIntoDictionary(OSDictionary *  sourceDictionary,  OSDictionary *  targetDictionary);
-	bool		HubAreAllPortsDisconnectedOrSuspended();
+    bool				MergeDictionaryIntoProvider(IOService *  provider, OSDictionary *  mergeDict);
+    bool				MergeDictionaryIntoDictionary(OSDictionary *  sourceDictionary,  OSDictionary *  targetDictionary);
+	bool				HubAreAllPortsDisconnectedOrSuspended();
+	
+	// new power stuff
+	void				AllocateExtraPower();						// used at init time
+	IOReturn			GetExtraPortPower(AppleUSBHubPort *port);
+	IOReturn			ReturnExtraPortPower(AppleUSBHubPort *port);
     
     // test mode functions, called by the AppleUSBHSHubUserClient
     IOReturn			EnterTestMode();

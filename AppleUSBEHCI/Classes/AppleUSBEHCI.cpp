@@ -54,6 +54,9 @@
 
 OSDefineMetaClassAndStructors(AppleUSBEHCI, IOUSBControllerV2)
 
+// this is a static variable (system wide global)
+AppleEHCIExtraPower		AppleUSBEHCI::_extraPower;						// this is static as currently it is share by all machines
+
 bool 
 AppleUSBEHCI::init(OSDictionary * propTable)
 {
@@ -269,6 +272,34 @@ AppleUSBEHCI::UIMInitialize(IOService * provider)
 	   	CapLength  = _pEHCICapRegisters->CapLength;
 		_pEHCIRegisters = (EHCIRegistersPtr) ( ((UInt32)_pEHCICapRegisters) + CapLength);
 		
+		// check for extra power
+		if (_extraPower.version == kAppleEHCIExtraPowerVersion)
+		{
+			USBLog(2, "AppleEHCI[%p]::UIMInitilaize - already have extra power structure initialized - aggregate(%d) perPort(%d) inSleep(%d)", this, (int)_extraPower.aggregate, (int)_extraPower.perPort, (int)_extraPower.inSleep);
+		}
+		else
+		{
+			OSNumber		*prop;
+			
+			prop = (OSNumber *)provider->getProperty(kAppleEHCIExtraPowerAggregate);
+			if (prop)
+			{
+				_extraPower.version = kAppleEHCIExtraPowerVersion;
+				_extraPower.aggregate = prop->unsigned32BitValue();
+				prop = (OSNumber *)provider->getProperty(kAppleEHCIExtraPowerPerPort);
+				if (prop)
+					_extraPower.perPort = prop->unsigned32BitValue();
+				prop = (OSNumber *)provider->getProperty(kAppleEHCIExtraPowerInSleep);
+				if (prop)
+					_extraPower.inSleep = prop->unsigned32BitValue();
+				USBLog(2, "AppleEHCI[%p]::UIMInitilaize - extra power structure initialized - aggregate(%d) perPort(%d) inSleep(%d)", this, (int)_extraPower.aggregate, (int)_extraPower.perPort, (int)_extraPower.inSleep);
+			}
+			else
+			{
+				USBLog(7, "AppleEHCI[%p]::UIMInitilaize - no ExtraPower property found!", this);
+			}
+		}
+		
 		// Enable the interrupt delivery.
 		_workLoop->enableAllInterrupts();
 		
@@ -283,6 +314,7 @@ AppleUSBEHCI::UIMInitialize(IOService * provider)
 		
 		for (i=0; (i < 100) && !(USBToHostLong(_pEHCIRegisters->USBSTS) & kEHCIHCHaltedBit); i++)
 			IOSleep(1);
+
 		if (i >= 100)
 		{
             USBError(1, "AppleUSBEHCI[%p]::UIMInitialize - could not get chip to halt within 100 ms",  this);
@@ -1578,37 +1610,78 @@ AppleUSBEHCI::message( UInt32 type, IOService * provider,  void * argument )
 	
     USBLog(6, "AppleUSBEHCI[%p]::message type: %p, isInactive = %d",  this, (void*)type, isInactive());
 
-	if (type == kIOUSBMessageExpressCardCantWake)
+	switch (type)
 	{
-		IOService *					nub = (IOService*)argument;
-		const IORegistryPlane *		usbPlane = getPlane(kIOUSBPlane);
-		IOUSBRootHubDevice *		parentHub = OSDynamicCast(IOUSBRootHubDevice, nub->getParentEntry(usbPlane));
+		case kIOUSBMessageExpressCardCantWake:
+			IOService *					nub = (IOService*)argument;
+			const IORegistryPlane *		usbPlane = getPlane(kIOUSBPlane);
+			IOUSBRootHubDevice *		parentHub = OSDynamicCast(IOUSBRootHubDevice, nub->getParentEntry(usbPlane));
 
-		nub->retain();
-		USBLog(1, "AppleUSBUHCI[%p]::message - got kIOUSBMessageExpressCardCantWake from driver %s[%p] argument is %s[%p]", this, provider->getName(), provider, nub->getName(), nub);
-		if (parentHub == _rootHubDevice)
-		{
-			USBLog(1, "AppleUSBUHCI[%p]::message - device is attached to my root hub!!", this);
-			_badExpressCardAttached = true;
-		}
-		nub->release();
-		return kIOReturnSuccess;  // this message was handled
+			nub->retain();
+			USBLog(1, "AppleUSBUHCI[%p]::message - got kIOUSBMessageExpressCardCantWake from driver %s[%p] argument is %s[%p]", this, provider->getName(), provider, nub->getName(), nub);
+			if (parentHub == _rootHubDevice)
+			{
+				USBLog(1, "AppleUSBUHCI[%p]::message - device is attached to my root hub!!", this);
+				_badExpressCardAttached = true;
+			}
+			nub->release();
+			return kIOReturnSuccess;  // this message was handled
+			break;
+			
+		case kIOPCCardCSEventMessage:
+			cs_event_t	pccardevent;
+			pccardevent = (UInt32) argument;
+			
+			if ( pccardevent == CS_EVENT_CARD_REMOVAL )
+			{
+				// Should return all transactions in any endpoints
+				//
+				USBLog(5,"AppleUSBEHCI[%p]: Received kIOPCCardCSEventMessage Need to return all transactions",this);
+				_pcCardEjected = true;
+			}
+			// let the super-class run as well...
+			break;
+
+		case kIOUSBMessageRequestExtraPower:
+			AppleRootHubExtraPowerRequest		*extraPowerRequest = (AppleRootHubExtraPowerRequest*)argument;
+			
+			if (_extraPower.version != kAppleEHCIExtraPowerVersion)
+				return kIOReturnNoResources;				
+			
+			// 0 - that seems silly
+			if (!extraPowerRequest->requestedExtraPower)
+			{
+				USBLog(7, "AppleUSBEHCI[%p]::message(kIOUSBMessageRequestExtraPower) - no extra power requested - fine with me", this);
+				extraPowerRequest->extraPowerAvailable = 0;
+				return kIOReturnSuccess;
+			}
+			
+			// < 0 -- returning power
+			if (extraPowerRequest->requestedExtraPower < 0)
+			{
+				// someone is giving the extra power back
+				_extraPower.aggregate = _extraPower.aggregate - extraPowerRequest->requestedExtraPower;
+				extraPowerRequest->extraPowerAvailable = 0;
+				USBLog(2, "AppleUSBEHCI[%p]::message(kIOUSBMessageRequestExtraPower) - requested(%d) - aggregate now at (%d)", this, (int)extraPowerRequest->requestedExtraPower, (int)_extraPower.aggregate);
+				return kIOReturnSuccess;
+			}
+			
+			// requesting new power
+			
+			// check to make sure there is enough aggregate
+			if ((UInt32)extraPowerRequest->requestedExtraPower > _extraPower.aggregate)
+				return kIOReturnNoResources;
+				
+			// now check to make sure there is enough on each port
+			if ((UInt32)extraPowerRequest->requestedExtraPower > _extraPower.perPort)
+				return kIOReturnNoResources;
+
+			extraPowerRequest->extraPowerAvailable = extraPowerRequest->requestedExtraPower;
+			_extraPower.aggregate = _extraPower.aggregate - extraPowerRequest->requestedExtraPower;
+			USBLog(2, "AppleUSBEHCI[%p]::message(kIOUSBMessageRequestExtraPower) - requested(%d) - aggregate now at (%d)", this, (int)extraPowerRequest->requestedExtraPower, (int)_extraPower.aggregate);
+			return kIOReturnSuccess;
+			break;
 	}
-
-    if ( type == kIOPCCardCSEventMessage)
-    {
-		cs_event_t	pccardevent;
-        pccardevent = (UInt32) argument;
-		
-        if ( pccardevent == CS_EVENT_CARD_REMOVAL )
-        {
-            // Should return all transactions in any endpoints
-            //
-            USBLog(5,"AppleUSBEHCI[%p]: Received kIOPCCardCSEventMessage Need to return all transactions",this);
-            _pcCardEjected = true;
-        }
-		// let the super-class run as well...
-    }
 	
 
     // Let our superclass decide handle this method

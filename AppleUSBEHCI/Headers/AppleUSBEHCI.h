@@ -139,6 +139,22 @@ enum{
 	kMaxPorts = 16
 };
 
+// stuff to manage "extra" USB power on some machines
+typedef struct AppleEHCIExtraPower
+{
+	UInt32			version;				// version of this structure
+	UInt32			perPort;				// the amount availeable per port above and beyond the 500ma in the spec (in milliamps) [AAPL,current-extra]
+	UInt32			aggregate;				// the total amount available on the controller or machine, to be allocated amoung all ports (in milliamps) [AAPL,current-available]
+	UInt32			inSleep;				// total amount of current available on the port when the machine is in sleep (in milliamps) [AAPL,current-extra]
+} AppleEHCIExtraPower;
+
+enum {
+	kAppleEHCIExtraPowerVersion = 0x100
+};
+
+#define kAppleEHCIExtraPowerAggregate		"AAPL,current-available"				// this one also has another name on legacy systems
+#define kAppleEHCIExtraPowerPerPort			"AAPL,current-extra"
+#define kAppleEHCIExtraPowerInSleep			"AAPL,current-in-sleep"
 
 class AppleUSBEHCI : public IOUSBControllerV2
 {
@@ -161,6 +177,8 @@ private:
     IOReturn						DeleteIsochEP(AppleEHCIIsochEndpoint*);
 	UInt8							LastScheduledSSMicroFrame(AppleEHCIIsochEndpoint* pEP);
 	UInt8							FirstScheduledSSMicroFrame(AppleEHCIIsochEndpoint* pEP);
+	
+	static AppleEHCIExtraPower		_extraPower;						// this is static as currently it is share by all machines
     
 protected:
 	IOPCIDevice *							_device;

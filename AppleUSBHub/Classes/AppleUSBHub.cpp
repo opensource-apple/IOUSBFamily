@@ -2,7 +2,7 @@
  *
  * @APPLE_LICENSE_HEADER_START@
  * 
- * Copyright (c) 1998-2006 Apple Computer, Inc.  All Rights Reserved.
+ * Copyright (c) 1998-2007 Apple Inc.  All Rights Reserved.
  * 
  * This file contains Original Code and/or Modifications of Original Code
  * as defined in and that are subject to the Apple Public Source License
@@ -53,8 +53,8 @@ So high byte can be 03 or 06 ----  low byte can be 01, 02, 03, 04, 05
 Currently we are working on a new mask with the new descriptors. The
 firmwarestatus will be higher than 05.
 */
-      {0x046a, 0x003, 0x0301, 0x0305, kErrataCaptiveOKBit}, // Cherry 4 port KB
-      {0x046a, 0x003, 0x0601, 0x0605, kErrataCaptiveOKBit}  // Cherry 4 port KB
+      {0x046a, 0x0003, 0x0301, 0x0305, kErrataCaptiveOKBit},					// Cherry 4 port KB 
+      {0x046a, 0x0003, 0x0601, 0x0605, kErrataCaptiveOKBit},					// Cherry 4 port KB
 };
 
 // from the EHCI driver
@@ -116,12 +116,13 @@ AppleUSBHub::init( OSDictionary * propTable )
 bool 
 AppleUSBHub::start(IOService * provider)
 {
-    IOReturn			err = 0;
+    IOReturn				err = 0;
     IOUSBRootHubDevice		*rootHub;
-    OSDictionary		*providerDict;
-    OSNumber 			* errataProperty;
+    OSDictionary			*providerDict;
+    OSNumber				* errataProperty;
     const IORegistryPlane	*usbPlane = NULL;
-    OSNumber			*locationIDProperty;
+    OSNumber				*locationIDProperty;
+
     
     _inStartMethod = true;
     IncrementOutstandingIO();		// make sure we don't close until start is done
@@ -175,7 +176,7 @@ AppleUSBHub::start(IOService * provider)
     
     // remember my device
     _device		= (IOUSBDevice *) provider;
-    _address		= _device->GetAddress();
+    _address	= _device->GetAddress();
     _bus		= _device->GetBus();
 	
     // Merge any properties in the IOProviderMergeProperties dictionary into our 
@@ -205,6 +206,26 @@ AppleUSBHub::start(IOService * provider)
     //
     _errataBits = GetHubErrataBits();
     
+	usbPlane = getPlane(kIOUSBPlane);
+	rootHub = OSDynamicCast(IOUSBRootHubDevice, provider);
+	if (rootHub)
+	{
+		_isRootHub = true;
+		// if my provider is an IOUSBRootHubDevice nub, then I should attach this hub device nub to the root.
+		//
+		
+		if (usbPlane)
+		{
+			rootHub->attachToParent(getRegistryRoot(), usbPlane);
+		}
+		
+	}
+	else
+	{
+		if (usbPlane)
+			_rootHubParent = OSDynamicCast(IOUSBRootHubDevice, provider->getParentEntry(usbPlane));
+	}
+        
     // Go ahead and configure the hub
     //
     err = ConfigureHub();
@@ -214,21 +235,6 @@ AppleUSBHub::start(IOService * provider)
 		if (_hsHub)
 			registerService();					// for the benefit of a user client
 		
-        rootHub = OSDynamicCast(IOUSBRootHubDevice, provider);
-        if (rootHub)
-        {
-			_isRootHub = true;
-            // if my provider is an IOUSBRootHubDevice nub, then I should attach this hub device nub to the root.
-            //
-            usbPlane = getPlane(kIOUSBPlane);
-            
-            if (usbPlane)
-            {
-                rootHub->attachToParent(getRegistryRoot(), usbPlane);
-            }
-            
-        }
-        
         // allocate a thread_call structure
         _workThread = thread_call_allocate((thread_call_func_t)ProcessStatusChangedEntry, (thread_call_param_t)this);
         _resetPortZeroThread = thread_call_allocate((thread_call_func_t)ResetPortZeroEntry, (thread_call_param_t)this);
@@ -561,6 +567,9 @@ AppleUSBHub::ConfigureHub()
         goto ErrorExit;
     }
     
+	// Check to see if we have any extra power to give to any of our downstream ports
+	AllocateExtraPower();
+
     err = AllocatePortMemory();
     if ( err != kIOReturnSuccess )
     {
@@ -581,6 +590,7 @@ AppleUSBHub::ConfigureHub()
 	// We will also specify the name of the UserClient, this is now applicable to full and high speed ports	
 	setProperty("IOUserClientClass", "AppleUSBHSHubUserClient");
 
+	
     err = StartPorts();
     if ( err != kIOReturnSuccess )
     {
@@ -664,13 +674,15 @@ IOReturn
 AppleUSBHub::CheckPortPowerRequirements(void)
 {
     IOReturn	err = kIOReturnSuccess;
-    /* Note hub current in units of 1mA, everything else in units of 2mA */
-    UInt32	hubPower = _hubDescriptor.hubCurrent/2;
-    UInt32	busPower = _device->GetBusPowerAvailable();
-    UInt32	powerAvailForPorts = 0;
-    UInt32	powerNeededForPorts = 0;
-    bool	startExternal;
 
+    // Note hub current in units of 1mA, everything else in units of 2mA
+    UInt32		hubPower = _hubDescriptor.hubCurrent/2;
+    UInt32		busPower = _device->GetBusPowerAvailable();
+    UInt32		powerAvailForPorts = 0;
+    UInt32		powerNeededForPorts = 0;
+    bool		startExternal;
+
+	USBLog(2, "AppleUSBHub[%p]::CheckPortPowerRequirements - busPower(%d) hubPower(%d)", this, (int)busPower, (int)hubPower);
     do
     {
         if (hubPower > busPower)
@@ -691,8 +703,7 @@ AppleUSBHub::CheckPortPowerRequirements(void)
             if(_numCaptive > 0)
             {
                 if(_busPowerGood)
-                    _powerForCaptive =
-                        (powerAvailForPorts - powerNeededForPorts) / _numCaptive;
+                    _powerForCaptive = (powerAvailForPorts - powerNeededForPorts) / _numCaptive;
                 else
                     _powerForCaptive = powerAvailForPorts / _numCaptive;
             }
@@ -794,7 +805,7 @@ AppleUSBHub::AllocatePortMemory(void)
 
     for (currentPort = 1; currentPort <= _hubDescriptor.numPorts; currentPort++)
     {
-        /* determine if the port is a captive port */
+        // determine if the port is a captive port
         if ((_hubDescriptor.removablePortFlags[portByte] & portMask) != 0)
         {
             power = _selfPowerGood ? (UInt32)kUSB500mAAvailable : _powerForCaptive;
@@ -813,7 +824,10 @@ AppleUSBHub::AllocatePortMemory(void)
             _ports[currentPort-1] = NULL;
         }
         else
+		{
             _ports[currentPort-1] = port;
+			USBLog(7, "AppleUSBHub[%p]::AllocatePortMemory - got(%s) captive port (%p) number (%d)", this, captive ? " " : " NON", port, (int)currentPort);
+		}
 
         portMask <<= 1;
         if(portMask > 0x80)
@@ -839,7 +853,7 @@ AppleUSBHub::StartPorts(void)
     for (currentPort = 1; currentPort <= _hubDescriptor.numPorts; currentPort++)
     {
         port = _ports[currentPort-1];
-	if (port)
+		if (port)
             port->start();
 
     }
@@ -875,6 +889,13 @@ AppleUSBHub::StopPorts(void)
         IOFree(cachedPorts, sizeof(AppleUSBHubPort *) * _hubDescriptor.numPorts);
     }
 
+	if (_extraPower.extraPowerAvailable && _rootHubParent)
+	{
+		USBLog(2, "AppleUSBHub[%p]::StopPorts - releasing (%d) extra power", this, (int)_extraPower.extraPowerAvailable);
+		_extraPower.requestedExtraPower = -_extraPower.extraPowerAvailable;
+		_rootHubParent->message(kIOUSBMessageRequestExtraPower, this, &_extraPower);
+	}
+	
     return kIOReturnSuccess;
 }
 
@@ -921,8 +942,7 @@ AppleUSBHub::HubStatusChanged(void)
         if (_hubStatus.changeFlags & kHubOverCurrentIndicatorChange)
         {
             USBLog(3, "AppleUSBHub[%p]: Hub OverCurrent Indicator Change detected", this);
-            if ((err =
-                 ClearHubFeature(kUSBHubOverCurrentChangeFeature)))
+            if ((err = ClearHubFeature(kUSBHubOverCurrentChangeFeature)))
             {
                 FatalError(err, "clear hub over current feature");
                 break;
@@ -982,9 +1002,9 @@ AppleUSBHub::HubStatusChanged(void)
 UInt32 
 AppleUSBHub::GetHubErrataBits()
 {
-      UInt16		vendID, deviceID, revisionID;
+      UInt16			vendID, deviceID, revisionID;
       ErrataListEntry	*entryPtr;
-      UInt32		i, errata = 0;
+      UInt32			i, errata = 0;
 
       // get this chips vendID, deviceID, revisionID
       vendID = _device->GetVendorID();
@@ -2610,6 +2630,88 @@ AppleUSBHub::HubAreAllPortsDisconnectedOrSuspended()
 	USBLog(6, "AppleUSBHub[%p](0x%lx)::HubAreAllPortsDisconnectedOrSuspended - YES THEY ARE", this, _locationID);
 	return true;
 }
+
+
+
+//
+// AllocateExtraPower
+// Checks to see if the device node has an ExtraPowerRequest property, and if so, tries to make that request from the root hub
+// If it is successful, then get an ExtraPowerPorts property to note which port(s) will be allowed to make use of this extra power
+//
+void
+AppleUSBHub::AllocateExtraPower()
+{
+    OSNumber				*extraPowerProp;
+	UInt32					extraPowerNeeded = 0;
+
+	USBLog(2, "AppleUSBHub[%p]::AllocateExtraPower - _rootHubParent(%p) _device(%p)", this, _rootHubParent, _device);
+	
+	if (!_rootHubParent || !_device)
+		return;
+
+    extraPowerProp = (OSNumber *)_device->getProperty("ExtraPowerRequest");
+    if ( extraPowerProp )
+        extraPowerNeeded = extraPowerProp->unsigned32BitValue();
+    
+	if (extraPowerNeeded)
+	{
+		USBLog(2, "AppleUSBHub[%p]::AllocateExtraPower - asking for extra power (%d)", this, (int)extraPowerNeeded);
+		_extraPower.requestedExtraPower = extraPowerNeeded;				// request 600 ma extra per the HW team
+		if (_rootHubParent->message(kIOUSBMessageRequestExtraPower, this, &_extraPower))
+			return;
+	}
+	
+	if (_extraPower.extraPowerAvailable)
+	{
+		OSNumber				*extraPowerProp;
+		
+		extraPowerProp = (OSNumber *)_device->getProperty("ExtraPowerPorts");
+		if ( extraPowerProp )
+			_extraPowerPorts = extraPowerProp->unsigned32BitValue();
+
+		if ( _extraPowerPorts )
+		{
+			USBLog(2, "AppleUSBHub[%p]::AllocateExtraPower - received extra power (%d) for ports (%p)", this, (int)_extraPower.extraPowerAvailable, (void*)_extraPowerPorts);
+			_extraPowerRemaining = _extraPower.extraPowerAvailable;
+		}
+		else
+		{
+			USBLog(1, "AppleUSBHub[%p]::AllocateExtraPower - no ports for extra power! UNEXPECTED! - Giving power back (%d)", this, (int)_extraPower.extraPowerAvailable);
+			_extraPower.requestedExtraPower = -_extraPower.extraPowerAvailable;
+			_rootHubParent->message(kIOUSBMessageRequestExtraPower, this, &_extraPower);
+		}
+	}
+}
+
+
+
+IOReturn
+AppleUSBHub::GetExtraPortPower(AppleUSBHubPort *port)
+{
+	USBLog(2, "AppleUSBHub[%p]::GetExtraPortPower for port[%p] _extraPowerRemaining[%d]", this, port, (int)_extraPowerRemaining);
+	
+	if (!_extraPowerRemaining)
+		return kIOReturnNoResources;
+		
+	port->_extraPower = _extraPowerRemaining;
+	_extraPowerRemaining = 0;
+	return kIOReturnSuccess;
+}
+
+
+
+IOReturn
+AppleUSBHub::ReturnExtraPortPower(AppleUSBHubPort *port)
+{
+	USBLog(2, "AppleUSBHub[%p]::ReturnExtraPortPower for port[%p] _extraPowerRemaining[%d] port->_extraPower[%d]", this, port, (int)_extraPowerRemaining, (int)port->_extraPower);
+	
+	_extraPowerRemaining = port->_extraPower;
+	port->_extraPower = 0;
+	
+	return kIOReturnSuccess;
+}
+
+
 
 #pragma mark ¥¥¥¥ User Client Methods ¥¥¥¥
 //================================================================================================

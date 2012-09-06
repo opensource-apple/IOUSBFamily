@@ -56,7 +56,9 @@
 //================================================================================================
 #define kUSBSetup 		kUSBNone
 #define kAppleCurrentAvailable	"AAPL,current-available"
-#define kUSBBusID		"AAPL,bus-id"
+#define kAppleCurrentInSleep	"AAPL,current-in-sleep"
+#define kAppleCurrentExtra		"AAPL,current-extra"
+#define kUSBBusID				"AAPL,bus-id"
 
 #define super IOUSBBus
 
@@ -101,10 +103,9 @@ typedef struct IOUSBSyncCompletionTarget IOUSBSyncCompletionTarget;
 //   Globals (static member variables)
 //
 //================================================================================================
-#define kUSBSetup 		kUSBNone
-#define kAppleCurrentAvailable	"AAPL,current-available"
-#define kUSBBusID		"AAPL,bus-id"
-#define	kMaxNumberUSBBusses	256
+#define kUSBSetup				kUSBNone
+#define kUSBBusID				"AAPL,bus-id"
+#define	kMaxNumberUSBBusses		256
 
 // These are really a static member variable (system wide global)
 //
@@ -2719,6 +2720,15 @@ IOUSBController::CreateRootHubDevice( IOService * provider, IOUSBRootHubDevice *
     appleCurrentProperty = provider->getProperty(kAppleCurrentAvailable);
     if (appleCurrentProperty)
         (*rootHubDevice)->setProperty(kAppleCurrentAvailable, appleCurrentProperty);
+
+	// 5187893 - do the same for these other two properties
+    appleCurrentProperty = provider->getProperty(kAppleCurrentInSleep);
+    if (appleCurrentProperty)
+        (*rootHubDevice)->setProperty(kAppleCurrentInSleep, appleCurrentProperty);
+
+    appleCurrentProperty = provider->getProperty(kAppleCurrentExtra);
+    if (appleCurrentProperty)
+        (*rootHubDevice)->setProperty(kAppleCurrentExtra, appleCurrentProperty);
 	
 ErrorExit:
 		

@@ -33,7 +33,7 @@
 	<key>CFBundleExecutable</key>
 	<string>USB Prober</string>
 	<key>CFBundleGetInfoString</key>
-	<string>2.7.5, Copyright © 2002-2007 Apple Inc., All Rights Reserved</string>
+	<string>2.7.5b11, Copyright © 2002-2007 Apple Inc., All Rights Reserved</string>
 	<key>CFBundleIconFile</key>
 	<string>USBProberIcon.icns</string>
 	<key>CFBundleIdentifier</key>
@@ -49,7 +49,7 @@
 	<key>CFBundleSignature</key>
 	<string>USBP</string>
 	<key>CFBundleVersion</key>
-	<string>2.7.5</string>
+	<string>2.7.5b11</string>
 	<key>NSMainNibFile</key>
 	<string>MainMenu</string>
 	<key>NSPrincipalClass</key>
@@ -422,7 +422,7 @@
 	<key>CFBundleExecutable</key>
 	<string>IOUSBFamily</string>
 	<key>CFBundleGetInfoString</key>
-	<string>2.7.5, Copyright © 2000-2007 Apple Inc., All Rights Reserved</string>
+	<string>2.7.7, Copyright © 2000-2007 Apple Inc., All Rights Reserved</string>
 	<key>CFBundleIconFile</key>
 	<string></string>
 	<key>CFBundleIdentifier</key>
@@ -434,11 +434,11 @@
 	<key>CFBundlePackageType</key>
 	<string>KEXT</string>
 	<key>CFBundleShortVersionString</key>
-	<string>2.7.5</string>
+	<string>2.7.7</string>
 	<key>CFBundleSignature</key>
 	<string>????</string>
 	<key>CFBundleVersion</key>
-	<string>2.7.5</string>
+	<string>2.7.7</string>
 	<key>IOKitPersonalities</key>
 	<dict/>
 	<key>OSBundleCompatibleVersion</key>
@@ -483,7 +483,7 @@
 	<key>CFBundleExecutable</key>
 	<string>AppleUSBHub</string>
 	<key>CFBundleGetInfoString</key>
-	<string>2.7.5, Copyright © 2000-2007 Apple Inc., All Rights Reserved</string>
+	<string>2.7.7, Copyright © 2000-2007 Apple Inc., All Rights Reserved</string>
 	<key>CFBundleIconFile</key>
 	<string></string>
 	<key>CFBundleIdentifier</key>
@@ -495,11 +495,11 @@
 	<key>CFBundlePackageType</key>
 	<string>KEXT</string>
 	<key>CFBundleShortVersionString</key>
-	<string>2.7.5</string>
+	<string>2.7.7</string>
 	<key>CFBundleSignature</key>
 	<string>????</string>
 	<key>CFBundleVersion</key>
-	<string>2.7.5</string>
+	<string>2.7.7</string>
 	<key>IOKitPersonalities</key>
 	<dict>
 		<key>AppleUSBHub0</key>
@@ -824,7 +824,7 @@
 	<key>CFBundleExecutable</key>
 	<string>IOUSBHIDDriver</string>
 	<key>CFBundleGetInfoString</key>
-	<string>2.7.5, Copyright © 2000-2007 Apple Inc., All Rights Reserved</string>
+	<string>2.7.7, Copyright © 2000-2007 Apple Inc., All Rights Reserved</string>
 	<key>CFBundleIconFile</key>
 	<string></string>
 	<key>CFBundleIdentifier</key>
@@ -836,11 +836,11 @@
 	<key>CFBundlePackageType</key>
 	<string>KEXT</string>
 	<key>CFBundleShortVersionString</key>
-	<string>2.7.5</string>
+	<string>2.7.7</string>
 	<key>CFBundleSignature</key>
 	<string>????</string>
 	<key>CFBundleVersion</key>
-	<string>2.7.5</string>
+	<string>2.7.7</string>
 	<key>IOKitPersonalities</key>
 	<dict>
 		<key>Generic Keyboard</key>
@@ -901,7 +901,7 @@
 	<key>CFBundleExecutable</key>
 	<string>AppleUSBMergeNub</string>
 	<key>CFBundleGetInfoString</key>
-	<string>2.7.5, Copyright © 2000-2007 Apple Computer Inc., All Rights Reserved</string>
+	<string>2.7.7, Copyright © 2000-2007 Apple Inc., All Rights Reserved</string>
 	<key>CFBundleIconFile</key>
 	<string></string>
 	<key>CFBundleIdentifier</key>
@@ -913,11 +913,11 @@
 	<key>CFBundlePackageType</key>
 	<string>KEXT</string>
 	<key>CFBundleShortVersionString</key>
-	<string>2.7.5</string>
+	<string>2.7.7</string>
 	<key>CFBundleSignature</key>
 	<string>????</string>
 	<key>CFBundleVersion</key>
-	<string>2.7.5</string>
+	<string>2.7.7</string>
 	<key>IOKitPersonalities</key>
 	<dict>
 		<key>ATEC 7in1 ExpressCard</key>
@@ -966,11 +966,6 @@
 			<string>IOUSBDevice</string>
 			<key>IOProviderMergeProperties</key>
 			<dict>
-				<key>IOCFPlugInTypes</key>
-				<dict>
-					<key>Test</key>
-					<string>Nano</string>
-				</dict>
 				<key>non-removable</key>
 				<string>Yes</string>
 			</dict>
@@ -1423,6 +1418,154 @@
 			<key>idVendor</key>
 			<integer>1452</integer>
 		</dict>
+		<key>LogitechCamera1</key>
+		<dict>
+			<key>CFBundleIdentifier</key>
+			<string>com.apple.driver.AppleUSBMergeNub</string>
+			<key>IOClass</key>
+			<string>AppleUSBMergeNub</string>
+			<key>IOProviderClass</key>
+			<string>IOUSBDevice</string>
+			<key>IOProviderMergeProperties</key>
+			<dict>
+				<key>USB Product Name</key>
+				<string>Logitech Camera</string>
+			</dict>
+			<key>idProduct</key>
+			<integer>2249</integer>
+			<key>idVendor</key>
+			<integer>1133</integer>
+		</dict>
+		<key>LogitechCamera2</key>
+		<dict>
+			<key>CFBundleIdentifier</key>
+			<string>com.apple.driver.AppleUSBMergeNub</string>
+			<key>IOClass</key>
+			<string>AppleUSBMergeNub</string>
+			<key>IOProviderClass</key>
+			<string>IOUSBDevice</string>
+			<key>IOProviderMergeProperties</key>
+			<dict>
+				<key>USB Product Name</key>
+				<string>Logitech Camera</string>
+			</dict>
+			<key>idProduct</key>
+			<integer>2252</integer>
+			<key>idVendor</key>
+			<integer>1133</integer>
+		</dict>
+		<key>LogitechCamera3</key>
+		<dict>
+			<key>CFBundleIdentifier</key>
+			<string>com.apple.driver.AppleUSBMergeNub</string>
+			<key>IOClass</key>
+			<string>AppleUSBMergeNub</string>
+			<key>IOProviderClass</key>
+			<string>IOUSBDevice</string>
+			<key>IOProviderMergeProperties</key>
+			<dict>
+				<key>USB Product Name</key>
+				<string>Logitech Camera</string>
+			</dict>
+			<key>idProduct</key>
+			<integer>2250</integer>
+			<key>idVendor</key>
+			<integer>1133</integer>
+		</dict>
+		<key>LogitechCamera4</key>
+		<dict>
+			<key>CFBundleIdentifier</key>
+			<string>com.apple.driver.AppleUSBMergeNub</string>
+			<key>IOClass</key>
+			<string>AppleUSBMergeNub</string>
+			<key>IOProviderClass</key>
+			<string>IOUSBDevice</string>
+			<key>IOProviderMergeProperties</key>
+			<dict>
+				<key>USB Product Name</key>
+				<string>Logitech Camera</string>
+			</dict>
+			<key>idProduct</key>
+			<integer>2254</integer>
+			<key>idVendor</key>
+			<integer>1133</integer>
+		</dict>
+		<key>LogitechCamera5</key>
+		<dict>
+			<key>CFBundleIdentifier</key>
+			<string>com.apple.driver.AppleUSBMergeNub</string>
+			<key>IOClass</key>
+			<string>AppleUSBMergeNub</string>
+			<key>IOProviderClass</key>
+			<string>IOUSBDevice</string>
+			<key>IOProviderMergeProperties</key>
+			<dict>
+				<key>USB Product Name</key>
+				<string>Logitech Camera</string>
+			</dict>
+			<key>idProduct</key>
+			<integer>2251</integer>
+			<key>idVendor</key>
+			<integer>1133</integer>
+		</dict>
+		<key>LogitechCamera6</key>
+		<dict>
+			<key>CFBundleIdentifier</key>
+			<string>com.apple.driver.AppleUSBMergeNub</string>
+			<key>IOClass</key>
+			<string>AppleUSBMergeNub</string>
+			<key>IOProviderClass</key>
+			<string>IOUSBDevice</string>
+			<key>IOProviderMergeProperties</key>
+			<dict>
+				<key>USB Product Name</key>
+				<string>Logitech Camera</string>
+			</dict>
+			<key>idProduct</key>
+			<integer>2497</integer>
+			<key>idVendor</key>
+			<integer>1133</integer>
+		</dict>
+		<key>M84 Hub</key>
+		<dict>
+			<key>CFBundleIdentifier</key>
+			<string>com.apple.driver.AppleUSBMergeNub</string>
+			<key>IOClass</key>
+			<string>AppleUSBMergeNub</string>
+			<key>IOProviderClass</key>
+			<string>IOUSBDevice</string>
+			<key>IOProviderMergeProperties</key>
+			<dict>
+				<key>ExtraPowerPorts</key>
+				<integer>2</integer>
+				<key>ExtraPowerRequest</key>
+				<integer>600</integer>
+			</dict>
+			<key>idProduct</key>
+			<integer>4101</integer>
+			<key>idVendor</key>
+			<integer>1452</integer>
+		</dict>
+		<key>M89 Hub</key>
+		<dict>
+			<key>CFBundleIdentifier</key>
+			<string>com.apple.driver.AppleUSBMergeNub</string>
+			<key>IOClass</key>
+			<string>AppleUSBMergeNub</string>
+			<key>IOProviderClass</key>
+			<string>IOUSBDevice</string>
+			<key>IOProviderMergeProperties</key>
+			<dict>
+				<key>ExtraPowerPorts</key>
+				<integer>2</integer>
+				<key>ExtraPowerRequest</key>
+				<integer>600</integer>
+			</dict>
+			<key>idProduct</key>
+			<integer>4102</integer>
+			<key>idVendor</key>
+			<integer>1452</integer>
+		</dict>
 		<key>Novatel ExpressCard</key>
 		<dict>
 			<key>CFBundleIdentifier</key>
@@ -1737,7 +1880,7 @@
 	<key>CFBundleExecutable</key>
 	<string>IOUSBCompositeDriver</string>
 	<key>CFBundleGetInfoString</key>
-	<string>2.7.5, Copyright © 2000-2007 Apple Inc., All Rights Reserved</string>
+	<string>2.7.7, Copyright © 2000-2007 Apple Inc., All Rights Reserved</string>
 	<key>CFBundleIconFile</key>
 	<string></string>
 	<key>CFBundleIdentifier</key>
@@ -1749,11 +1892,11 @@
 	<key>CFBundlePackageType</key>
 	<string>KEXT</string>
 	<key>CFBundleShortVersionString</key>
-	<string>2.7.5</string>
+	<string>2.7.7</string>
 	<key>CFBundleSignature</key>
 	<string>????</string>
 	<key>CFBundleVersion</key>
-	<string>2.7.5</string>
+	<string>2.7.7</string>
 	<key>IOKitPersonalities</key>
 	<dict>
 		<key>AppleUSBPrinterDevice0</key>
@@ -2104,7 +2247,7 @@
 	<key>CFBundleExecutable</key>
 	<string>AppleUSBEHCI</string>
 	<key>CFBundleGetInfoString</key>
-	<string>2.7.5, Copyright © 2000-2007 Apple Inc., All Rights Reserved</string>
+	<string>2.7.7, Copyright © 2000-2007 Apple Inc., All Rights Reserved</string>
 	<key>CFBundleIconFile</key>
 	<string></string>
 	<key>CFBundleIdentifier</key>
@@ -2116,11 +2259,11 @@
 	<key>CFBundlePackageType</key>
 	<string>KEXT</string>
 	<key>CFBundleShortVersionString</key>
-	<string>2.7.5</string>
+	<string>2.7.7</string>
 	<key>CFBundleSignature</key>
 	<string>????</string>
 	<key>CFBundleVersion</key>
-	<string>2.7.5</string>
+	<string>2.7.7</string>
 	<key>IOKitPersonalities</key>
 	<dict>
 		<key>AppleUSBEHCI</key>

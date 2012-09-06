@@ -433,7 +433,39 @@ IOUSBHIDDriver::message( UInt32 type, IOService * provider,  void * argument )
             ABORTEXPECTED = FALSE;
             _deviceHasBeenDisconnected = FALSE;
 			
-            err = RearmInterruptRead();
+			// Redo any initialization that we did at boot time
+			
+			if ( _interface && _device )
+			{
+				// For Keyboards, set the idle millecs to 24 or to 0 if from Apple
+				//
+				if ( (_interface->GetInterfaceClass() == kUSBHIDClass) &&
+					 (_interface->GetInterfaceSubClass() == kUSBHIDBootInterfaceSubClass) &&
+					 (_interface->GetInterfaceProtocol() == kHIDKeyboardInterfaceProtocol) )
+				{
+					if (_device->GetVendorID() == kIOUSBVendorIDAppleComputer)
+					{
+						SetIdleMillisecs(0);
+					}
+					else
+					{
+						SetIdleMillisecs(24);
+					}
+				}
+				
+				// Set the device into Report Protocol if it's a bootInterface subClass interface
+				//
+				if (_interface->GetInterfaceSubClass() == kUSBHIDBootInterfaceSubClass)
+					err = SetProtocol( kHIDReportProtocolValue );
+				
+				// Errata for ALL Saitek devices.  Do a SET_IDLE 0 call
+				//
+				if ( (_device->GetVendorID()) == 0x06a3 )
+					SetIdleMillisecs(0);
+			}
+				
+			// Finally, rearm our read
+			err = RearmInterruptRead();
 			break;
 			
         case kIOUSBMessagePortHasBeenSuspended:
@@ -460,9 +492,9 @@ IOUSBHIDDriver::message( UInt32 type, IOService * provider,  void * argument )
 				// Now, set it again
 				_suspendPortTimer->setTimeoutMS(_suspendTimeoutInMS);
 			}
+				
+				break;
 			
-            break;
-
         default:
             break;
     }

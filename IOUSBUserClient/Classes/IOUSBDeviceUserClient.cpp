@@ -473,7 +473,7 @@ IOUSBDeviceUserClient::ReqComplete(void *obj, void *param, IOReturn res, UInt32 
 	pb->fMem->release();
     }
     if (!me->fDead)
-		sendAsyncResult(pb->fAsyncRef, res, args, 1);
+	sendAsyncResult(pb->fAsyncRef, res, args, 1);
 
     IOFree(pb, sizeof(*pb));
     me->DecrementOutstandingIO();

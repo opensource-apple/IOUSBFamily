@@ -50,8 +50,6 @@ enum {
 // USB bus has two power states, off and on
 #define number_of_power_states 2
 
-#define kAppleCurrentAvailable	"AAPL,current-available"
-
 // Note: This defines two states. off and on. In the off state, the bus is suspended. We
 // really should have three state, off (reset), suspended (suspend), and on (operational)
 //
