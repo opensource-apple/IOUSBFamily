@@ -45,10 +45,10 @@
 - (IBAction)ToggleAutoRefresh:(id)sender;
 - (IBAction)ToggleProbeSuspended:(id)sender;
 
-- (void)applyFilter:(BusProbeDevice*)filterDevice:(NSMutableString *)finalString;
-- (NSMutableArray *)strippedDownListFromFilter:(BusProbeDevice *)filterDevice;
-- (void)dumpToTerminal:(NSArray*)args:(bool)showHelp;
-- (void)busProberInformationDidChange:(BusProber *)aProber;
+- (void)applyFilter :(BusProbeDevice*)filterDevice :(NSMutableString *)finalString;
+- (NSMutableArray *)strippedDownListFromFilter :(BusProbeDevice *)filterDevice;
+- (void)dumpToTerminal :(NSArray*)args :(bool)showHelp;
+- (void)busProberInformationDidChange :(BusProber *)aProber;
 - (void)expandOutlineViewItems;
 
 @end

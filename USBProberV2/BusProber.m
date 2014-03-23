@@ -239,14 +239,14 @@ static void DeviceRemoved(void *refCon, io_iterator_t iterator)
     
     // Set the name of the device (this is what will be shown in the UI)
     [thisDevice setDeviceName:
-	 [NSString stringWithFormat:@"%s Speed device @ %d (0x%08lX): .............................................",
+	 [NSString stringWithFormat:@"%s Speed device @ %d (0x%08X): .............................................",
 #ifdef SUPPORTS_SS_USB
 	  (speed == kUSBDeviceSpeedSuper ? "Super" : (speed == kUSBDeviceSpeedHigh ? "High" :(speed == kUSBDeviceSpeedFull ? "Full" : "Low"))),
 #else
 	  (speed == kUSBDeviceSpeedHigh ? "High" : (speed == kUSBDeviceSpeedLow ? "Low" : "Full")), 
 #endif
 	  address, 
-	  locationID]];    
+	  (unsigned int)locationID]];    
 	
 	// Get the Port Information
 	error = GetPortInformation(deviceIntf, &portInfo);

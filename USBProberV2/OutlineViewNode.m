@@ -128,7 +128,7 @@
     [walker addChild:aNode];
 }
 
-- (NSString*)stringRepresentation:(NSString*)name:(int)startingLevel
+- (NSString*)stringRepresentation :(NSString*)name :(int)startingLevel
 {
     int i;
     NSMutableString *finalText = [[NSMutableString alloc] init];

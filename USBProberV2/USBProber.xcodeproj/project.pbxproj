@@ -131,7 +131,7 @@
 		3E0EA84B050D1F76009D1D9C /* KLog.h */ = {isa = PBXFileReference; fileEncoding = 30; lastKnownFileType = sourcecode.c.h; name = KLog.h; path = KLog/KLog.h; sourceTree = "<group>"; };
 		3E0EA84C050D1F76009D1D9C /* KLogClient.cpp */ = {isa = PBXFileReference; fileEncoding = 30; lastKnownFileType = sourcecode.cpp.cpp; name = KLogClient.cpp; path = KLog/KLogClient.cpp; sourceTree = "<group>"; };
 		3E0EA84D050D1F76009D1D9C /* KLogClient.h */ = {isa = PBXFileReference; fileEncoding = 30; lastKnownFileType = sourcecode.c.h; name = KLogClient.h; path = KLog/KLogClient.h; sourceTree = "<group>"; };
-		3E0EA850050D1F76009D1D9C /* English */ = {isa = PBXFileReference; fileEncoding = 30; lastKnownFileType = text.plist.strings; name = English; path = English.lproj/InfoPlist.strings; sourceTree = "<group>"; };
+		3E0EA850050D1F76009D1D9C /* English */ = {isa = PBXFileReference; fileEncoding = 10; lastKnownFileType = text.plist.strings; name = English; path = English.lproj/InfoPlist.strings; sourceTree = "<group>"; };
 		3E0EA950050D21FB009D1D9C /* USBLoggerFilterWindowController.h */ = {isa = PBXFileReference; fileEncoding = 30; lastKnownFileType = sourcecode.c.h; path = USBLoggerFilterWindowController.h; sourceTree = "<group>"; };
 		3E0EA951050D21FB009D1D9C /* USBLoggerFilterWindowController.m */ = {isa = PBXFileReference; fileEncoding = 30; lastKnownFileType = sourcecode.c.objc; path = USBLoggerFilterWindowController.m; sourceTree = "<group>"; };
 		3E0EA9DC050D223D009D1D9C /* clean.tiff */ = {isa = PBXFileReference; lastKnownFileType = image.tiff; path = clean.tiff; sourceTree = "<group>"; };
@@ -143,6 +143,7 @@
 		3ED5D6840DD4A2CE00AD5562 /* KLog.kext */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = KLog.kext; sourceTree = BUILT_PRODUCTS_DIR; };
 		3ED5D6B30DD4AA2200AD5562 /* KLog.plist */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = text.plist.xml; name = KLog.plist; path = KLog/KLog.plist; sourceTree = "<group>"; };
 		3ED5D6EE0DD4AC3A00AD5562 /* KLogInfoPlist.pch */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = KLogInfoPlist.pch; path = KLog/KLogInfoPlist.pch; sourceTree = "<group>"; };
+		526059EA18DF0E3600E421CA /* Kernel.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = Kernel.framework; path = System/Library/Frameworks/Kernel.framework; sourceTree = SDKROOT; };
 		7206B40C04C3392200856A2F /* Security.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = Security.framework; path = /System/Library/Frameworks/Security.framework; sourceTree = "<absolute>"; };
 		7206B50A04C33BFD00856A2F /* SetKLogPermissions.sh */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = text.script.sh; path = SetKLogPermissions.sh; sourceTree = "<group>"; };
 		724C8B9904B241770045B190 /* DecodeDeviceQualifierDescriptor.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = DecodeDeviceQualifierDescriptor.h; sourceTree = "<group>"; };
@@ -206,7 +207,7 @@
 		72DDD15E04A298B20067E712 /* mark.tiff */ = {isa = PBXFileReference; lastKnownFileType = image.tiff; path = mark.tiff; sourceTree = "<group>"; };
 		72DDD16004A298B60067E712 /* clear.tiff */ = {isa = PBXFileReference; lastKnownFileType = image.tiff; path = clear.tiff; sourceTree = "<group>"; };
 		72E78FAF04B4C1AD00644F51 /* DecodeAudioInterfaceDescriptor.h */ = {isa = PBXFileReference; fileEncoding = 30; lastKnownFileType = sourcecode.c.h; path = DecodeAudioInterfaceDescriptor.h; sourceTree = "<group>"; };
-		72E78FB004B4C1AD00644F51 /* DecodeAudioInterfaceDescriptor.m */ = {isa = PBXFileReference; fileEncoding = 30; lastKnownFileType = sourcecode.c.objc; path = DecodeAudioInterfaceDescriptor.m; sourceTree = "<group>"; };
+		72E78FB004B4C1AD00644F51 /* DecodeAudioInterfaceDescriptor.m */ = {isa = PBXFileReference; fileEncoding = 7; lastKnownFileType = sourcecode.c.objc; path = DecodeAudioInterfaceDescriptor.m; sourceTree = "<group>"; };
 		72E78FBF04B4CF0C00644F51 /* DecodeCommClassDescriptor.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = DecodeCommClassDescriptor.h; sourceTree = "<group>"; };
 		72E78FC004B4CF0D00644F51 /* DecodeCommClassDescriptor.m */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.objc; path = DecodeCommClassDescriptor.m; sourceTree = "<group>"; };
 		84281E5E126782430039577F /* PortStatusController.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = PortStatusController.h; sourceTree = "<group>"; };
@@ -333,6 +334,7 @@
 		29B97323FDCFA39411CA2CEA /* Frameworks */ = {
 			isa = PBXGroup;
 			children = (
+				526059EA18DF0E3600E421CA /* Kernel.framework */,
 				1058C7A0FEA54F0111CA2CBB /* Linked Frameworks */,
 				1058C7A2FEA54F0111CA2CBB /* Other Frameworks */,
 			);
@@ -563,7 +565,7 @@
 		29B97313FDCFA39411CA2CEA /* Project object */ = {
 			isa = PBXProject;
 			attributes = {
-				LastUpgradeCheck = 0420;
+				LastUpgradeCheck = 0510;
 			};
 			buildConfigurationList = 3E420D2E08E1B98300FD1873 /* Build configuration list for PBXProject "USBProber" */;
 			compatibilityVersion = "Xcode 3.2";
@@ -735,7 +737,7 @@
 		3E420D2B08E1B98300FD1873 /* Development */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
-				ARCHS = "$(ARCHS_STANDARD_32_64_BIT)";
+				COMBINE_HIDPI_IMAGES = YES;
 				COPY_PHASE_STRIP = NO;
 				DEBUGGING_SYMBOLS = YES;
 				FRAMEWORK_SEARCH_PATHS = "";
@@ -752,6 +754,7 @@
 				INFOPLIST_FILE = Info.plist;
 				INSTALL_PATH = "$(HOME)/Applications";
 				LIBRARY_SEARCH_PATHS = "";
+				MACOSX_DEPLOYMENT_TARGET = 10.8;
 				OTHER_CFLAGS = "";
 				OTHER_LDFLAGS = "";
 				PRODUCT_NAME = "USB Prober";
@@ -769,7 +772,7 @@
 		3E420D2C08E1B98300FD1873 /* Deployment */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
-				ARCHS = "$(ARCHS_STANDARD_32_64_BIT)";
+				COMBINE_HIDPI_IMAGES = YES;
 				COPY_PHASE_STRIP = YES;
 				DEPLOYMENT_LOCATION = YES;
 				DEPLOYMENT_POSTPROCESSING = YES;
@@ -786,6 +789,7 @@
 				INFOPLIST_FILE = Info.plist;
 				INSTALL_PATH = "$(HOME)/Applications";
 				LIBRARY_SEARCH_PATHS = "";
+				MACOSX_DEPLOYMENT_TARGET = 10.8;
 				OTHER_CFLAGS = "";
 				OTHER_LDFLAGS = "";
 				PRODUCT_NAME = "USB Prober";
@@ -803,7 +807,7 @@
 		3E420D2D08E1B98300FD1873 /* Default */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
-				ARCHS = "$(ARCHS_STANDARD_32_64_BIT)";
+				COMBINE_HIDPI_IMAGES = YES;
 				FRAMEWORK_SEARCH_PATHS = "";
 				GCC_ENABLE_TRIGRAPHS = NO;
 				GCC_GENERATE_DEBUGGING_SYMBOLS = NO;
@@ -816,6 +820,7 @@
 				INFOPLIST_FILE = Info.plist;
 				INSTALL_PATH = "$(HOME)/Applications";
 				LIBRARY_SEARCH_PATHS = "";
+				MACOSX_DEPLOYMENT_TARGET = 10.8;
 				OTHER_CFLAGS = "";
 				OTHER_LDFLAGS = "";
 				PRODUCT_NAME = "USB Prober";
@@ -832,7 +837,6 @@
 		3E420D2F08E1B98300FD1873 /* Development */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
-				ARCHS = "$(ARCHS_STANDARD_32_64_BIT)";
 				GCC_PREPROCESSOR_DEFINITIONS = "_FORTIFY_SOURCE=2";
 				ONLY_ACTIVE_ARCH = YES;
 				VALID_ARCHS = "x86_64 i386 ppc";
@@ -842,7 +846,6 @@
 		3E420D3008E1B98300FD1873 /* Deployment */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
-				ARCHS = "$(ARCHS_STANDARD_32_64_BIT)";
 				GCC_PREPROCESSOR_DEFINITIONS = "_FORTIFY_SOURCE=2";
 				ONLY_ACTIVE_ARCH = YES;
 				VALID_ARCHS = "x86_64 i386 ppc";
@@ -852,7 +855,6 @@
 		3E420D3108E1B98300FD1873 /* Default */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
-				ARCHS = "$(ARCHS_STANDARD_32_64_BIT)";
 				GCC_PREPROCESSOR_DEFINITIONS = "_FORTIFY_SOURCE=2";
 				ONLY_ACTIVE_ARCH = YES;
 				VALID_ARCHS = "x86_64 i386 ppc";
@@ -862,11 +864,7 @@
 		3ED5D6800DD4A2CE00AD5562 /* Development */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
-				ARCHS = (
-					i386,
-					ppc,
-					x86_64,
-				);
+				COMBINE_HIDPI_IMAGES = YES;
 				COPY_PHASE_STRIP = NO;
 				FRAMEWORK_SEARCH_PATHS = "";
 				GCC_DYNAMIC_NO_PIC = NO;
@@ -903,11 +901,7 @@
 		3ED5D6810DD4A2CE00AD5562 /* Deployment */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
-				ARCHS = (
-					i386,
-					ppc,
-					x86_64,
-				);
+				COMBINE_HIDPI_IMAGES = YES;
 				COPY_PHASE_STRIP = YES;
 				DEPLOYMENT_LOCATION = YES;
 				DEPLOYMENT_POSTPROCESSING = YES;
@@ -944,11 +938,7 @@
 		3ED5D6820DD4A2CE00AD5562 /* Default */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
-				ARCHS = (
-					i386,
-					ppc,
-					x86_64,
-				);
+				COMBINE_HIDPI_IMAGES = YES;
 				FRAMEWORK_SEARCH_PATHS = "";
 				GCC_SYMBOLS_PRIVATE_EXTERN = NO;
 				HEADER_SEARCH_PATHS = "";
