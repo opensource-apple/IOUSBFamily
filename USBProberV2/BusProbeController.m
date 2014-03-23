@@ -173,7 +173,7 @@
 	[self Refresh:self];
 }
 
-- (void)dumpToTerminal:(NSArray*)args:(bool)showHelp
+- (void)dumpToTerminal:(NSArray*)args :(bool)showHelp
 {
 	NSMutableString *finalString = [[NSMutableString alloc] init];
     bool xmlOutput = NO;
@@ -270,7 +270,7 @@
 	[finalString release];
 }
 
-- (void)applyFilter:(BusProbeDevice*)filterDevice:(NSMutableString *)finalString
+- (void)applyFilter :(BusProbeDevice*)filterDevice :(NSMutableString *)finalString
 {
 	NSEnumerator *devicesEnumerator = [_devicesArray objectEnumerator];
 	BusProbeDevice *thisDevice;

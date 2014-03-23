@@ -220,27 +220,34 @@
 			}
         }
         
-        if ( interrupt )
-            if ( (endpointDescriptor.bInterval == 0) || (endpointDescriptor.bInterval > 16) )
+        if ( interrupt ) {
+            if ( (endpointDescriptor.bInterval == 0) || (endpointDescriptor.bInterval > 16) ) {
 #ifdef SUPPORTS_SS_USB
                 sprintf(temporaryString, "%d: Illegal value for bInterval for a hi-speed/SuperSpeed Interrupt endpoint", endpointDescriptor.bInterval);
 #else
                 sprintf(temporaryString, "%d: Illegal value for bInterval for a hi-speed Interrupt endpoint", endpointDescriptor.bInterval);
 #endif
+            }
             else
+            {
                 sprintf(temporaryString, "%d (%d %s (%d %s) )", endpointDescriptor.bInterval, (1 << (endpointDescriptor.bInterval-1)), endpointDescriptor.bInterval==1?"microframe":"microframes", 
 						(endpointDescriptor.bInterval > 3 ? (1 << (endpointDescriptor.bInterval-1))/8 : endpointDescriptor.bInterval * 125), endpointDescriptor.bInterval > 3?"msecs":"microsecs" );
-        
-        if ( isoch )
-            if ( (endpointDescriptor.bInterval == 0) || (endpointDescriptor.bInterval > 16) )
+            }
+        }
+        if ( isoch ) {
+            if ( (endpointDescriptor.bInterval == 0) || (endpointDescriptor.bInterval > 16) ) {
 #ifdef SUPPORTS_SS_USB
                 sprintf(temporaryString, "Illegal value for bInterval for a hi-speed/SuperSpeed isoch endpoint: %d", endpointDescriptor.bInterval);
 #else
                 sprintf(temporaryString, "Illegal value for bInterval for a hi-speed isoch endpoint: %d", endpointDescriptor.bInterval);
 #endif
+            }
             else
-                sprintf(temporaryString, "%d (%d %s (%d %s) )", endpointDescriptor.bInterval, (1 << (endpointDescriptor.bInterval-1)), endpointDescriptor.bInterval==1?"microframe":"microframes", 
+            {
+                sprintf(temporaryString, "%d (%d %s (%d %s) )", endpointDescriptor.bInterval, (1 << (endpointDescriptor.bInterval-1)), endpointDescriptor.bInterval==1?"microframe":"microframes",
 						endpointDescriptor.bInterval > 3 ? (1 << (endpointDescriptor.bInterval-1))/8 : endpointDescriptor.bInterval * 125, endpointDescriptor.bInterval > 3?"msecs":"microsecs" );
+            }
+        }
     }
     else
     {

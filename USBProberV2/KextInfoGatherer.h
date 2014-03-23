@@ -29,6 +29,11 @@
 #import <mach/mach_host.h>
 
 
+typedef uint32_t  OSKextLoadTag;
+#define kOSBundleLoadTagKey                     "OSBundleLoadTag"
+#define  kOSKextInvalidLoadTag  ((OSKextLoadTag)(-1))
+
+
 @interface KextInfoGatherer : NSObject {
 
 }
